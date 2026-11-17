@@ -65,3 +65,20 @@
 **English**: "OS" **includes porting to the target OS (JCL, UNIX shell, Windows API, ...)**. The OSes the installed app itself runs on will be decided after gathering information (below is my unverified estimate).
 - OS as conversion subject: JCL/REXX/CLIST (mainframe), sh/ksh/bash (UNIX/Linux), PowerShell/batch/Win32/COM (Windows), Cocoa/AppleScript (Mac), plus per-OS API mapping tables. This needs an **OS API mapping table** separate from language conversion.
 - OSes the app runs on: proven = Windows x64/ARM64, Linux amd64/arm64, macOS arm64/x64 (tested in the COBOL_to / Java_to CI). I understand Rust has no official z/OS support (unverified), so bringing source files to a PC is the realistic path for mainframe. UNIX variants (AIX, Solaris, HP-UX, FreeBSD) vary (to investigate).
+
+---
+## 移植(プラットフォーム変換)の想定(2026-11-18、所有者) / Platform porting scenario (owner)
+**日本語**
+- **変換元の環境**: メインフレーム、UNIX、スーパーコンピューター系。言語は C、C++、Python、COBOL など。
+- **変換先の環境**: Windows、Linux、UNIX。
+- 言語を変えず**OSだけ移す移植**(例: メインフレームのCOBOL/JCL → Linux上のCOBOL+シェル、UNIXのC → Windows/Linuxの標準C/POSIX、スパコンのPython → 通常環境)と、**言語も変える変換**の両方を扱う。前者は「OS API対応表」と「ビルド・実行環境の移行」が中心になる。
+- スパコン系で想定される固有要素(私の見積もり、未検証): MPI、OpenMP、CUDA/HIP、ジョブスケジューラ(Slurm・PBS・LSF)、環境モジュール、Fortran(一覧では✕としていたが、スパコンでは主要言語なので再検討が要る)。
+- メインフレーム固有(同): EBCDIC、固定長レコード、VSAM、CICS、IMS、DB2、JCL、REXX、PL/I、RPG。
+- 未決: スパコン固有要素(MPI・GPU・ジョブスケジューラ)を変換対象に入れるか、検出して報告のみにするか。Fortran を主要言語に加えるか。
+**English**
+- **Source environments**: mainframe, UNIX, supercomputer class. Languages: C, C++, Python, COBOL, etc.
+- **Target environments**: Windows, Linux, UNIX.
+- Covers both **OS-only porting that keeps the language** (e.g. mainframe COBOL/JCL -> COBOL + shell on Linux; UNIX C -> standard C/POSIX on Windows/Linux; supercomputer Python -> ordinary environment) and **conversion that also changes the language**. The former centres on an OS API mapping table and migrating the build/run environment.
+- Supercomputer-specific items (my estimate, unverified): MPI, OpenMP, CUDA/HIP, job schedulers (Slurm, PBS, LSF), environment modules, Fortran (rated "not suitable" in the list, but it is a main language on supercomputers; needs reconsideration).
+- Mainframe-specific (same caveat): EBCDIC, fixed-length records, VSAM, CICS, IMS, DB2, JCL, REXX, PL/I, RPG.
+- Open: whether to convert supercomputer-specific parts (MPI, GPU, schedulers) or detect and report only; whether to add Fortran to the main languages.
