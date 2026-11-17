@@ -56,3 +56,12 @@
 - **Mutual (both-way) conversion assumed**, including each language's well-known frameworks and databases. Only an assumption; the not-exhaustive policy stays.
 - **Design note (my estimate)**: all-pairs conversion of 21 languages is 21 x 20 = 420 directed pairs. Rather than build each, go through a shared IR (21 frontends + 21 backends). Languages differ a lot (Access = DB + UI + VBA in one, COBOL = procedural + reports, Rust = ownership), so what the IR cannot express stays as `TODO`, as in the existing tools.
 - **Meaning of "OS"**: undecided whether it also covers porting to the OS (JCL, UNIX shell, Windows API, Mac) or only the OSes the installed app supports.
+
+---
+## 「OS」の意味(2026-11-18、所有者の決定) / Meaning of "OS" (owner decision)
+**日本語**: 「OS」は**動作OSへの移植(JCL、UNIXシェル、Windows API など)を含める**。インストール型アプリ自体の対応OSの範囲は、情報を集めてから決める(下記は私の見積もりで未検証)。
+- 変換の対象(コンテンツ)としてのOS: JCL・REXX・CLIST(メインフレーム)、sh/ksh/bash(UNIX/Linux)、PowerShell・バッチ・Win32/COM(Windows)、Cocoa/AppleScript(Mac)、各OSのAPI対応表。→ 言語変換とは別に**OS API対応表**が要る。
+- アプリが動くOS: 実績=Windows x64/ARM64、Linux amd64/arm64、macOS arm64/x64(COBOL_to / Java_to のCIで試験)。メインフレーム(z/OS)ではRustの公式対応が無いと理解しており(未検証)、変換元ファイルをPCへ持ってきて変換する形が現実的。UNIX系(AIX・Solaris・HP-UX・FreeBSD)は対応状況が分かれる(要調査)。
+**English**: "OS" **includes porting to the target OS (JCL, UNIX shell, Windows API, ...)**. The OSes the installed app itself runs on will be decided after gathering information (below is my unverified estimate).
+- OS as conversion subject: JCL/REXX/CLIST (mainframe), sh/ksh/bash (UNIX/Linux), PowerShell/batch/Win32/COM (Windows), Cocoa/AppleScript (Mac), plus per-OS API mapping tables. This needs an **OS API mapping table** separate from language conversion.
+- OSes the app runs on: proven = Windows x64/ARM64, Linux amd64/arm64, macOS arm64/x64 (tested in the COBOL_to / Java_to CI). I understand Rust has no official z/OS support (unverified), so bringing source files to a PC is the realistic path for mainframe. UNIX variants (AIX, Solaris, HP-UX, FreeBSD) vary (to investigate).
