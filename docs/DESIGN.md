@@ -92,3 +92,8 @@
 ## 追記: スパコン言語は「変換先」にもなる(2026-11-18、所有者) / Supercomputer languages are also conversion targets
 **日本語**: 変換先にスパコン向けの言語・モデルも含める(例: 通常のC/COBOL/Python/Java → MPI+OpenMP の C/C++/Fortran、GPU向けCUDA/HIP/SYCL など)。一覧は `docs/LANGUAGES.md` の「G. スパコン・HPC」。ただし自動で並列化の最適解を作るのは難しいため、**まず逐次コードの移植と、並列化の定型パターン(ループのOpenMP化・配列のGPU転送など)の提案**にとどめ、性能の保証はしない方針案(未決)。
 **English**: Supercomputer-oriented languages and models are also conversion **targets** (e.g. plain C/COBOL/Python/Java -> C/C++/Fortran with MPI + OpenMP, or GPU code in CUDA/HIP/SYCL). See "G. Supercomputer / HPC" in `docs/LANGUAGES.md`. Automatically producing an optimal parallelisation is hard, so the draft policy (undecided) is to **port serial code first and suggest standard parallel patterns** (OpenMP loops, GPU data transfer, ...) with no performance guarantee.
+
+---
+## 決定: 翻訳システムは分ける(2026-11-18、所有者) / Decision: keep the translation system separate
+**日本語**: AI による翻訳(WEB版の説明書を世界中の言語で出す、など)は、pl2pl の変換器(プログラミング言語・フレームワークの変換)とは**別のシステム**にする。変換器は翻訳にもLLMにも依存しない。LLM(aruaru-llm)を使う翻訳・説明の補助は、別コンポーネントとして任意に組み合わせる(`components/README.md`)。※「翻訳システム」を上のように解釈した。違えば訂正してほしい(例: 自然言語ではなくプログラミング言語の変換部分を分ける、の意味だった場合)。
+**English**: AI translation (e.g. producing the web manuals in many languages) is a **separate system** from pl2pl's converters (programming language/framework conversion). The converters depend on neither translation nor an LLM. LLM-assisted translation/explanations (aruaru-llm) is an optional separate component (`components/README.md`). Note: this interprets "translation system" as above; please correct if it meant splitting the programming-language conversion part instead.

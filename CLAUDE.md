@@ -27,3 +27,5 @@
 - 判定は保守的: 依存・副作用の恐れがあれば**付けずに理由を報告**する。性能は保証しない。
 - WSL で試験: `wsl -d Ubuntu -- bash /mnt/f/pl2pl/tests/run-all.sh`(`bash -c` に `$PATH` を書くとホスト側で展開される)。Windows の Git Bash では heredoc の `\` が消えることがあるので Rust ソースは Write ツールで書く。
 - 同梱の実態は `components/README.md`(open-cpu のみバイナリ内。open-cuda/open-directx は試作の出力先、aruaru-llm は未連携)。
+
+- 翻訳システム(AIによる自然言語の翻訳)は変換器と分ける。変換器は LLM に依存しない(`docs/DESIGN.md` 末尾) / The translation system is separate from the converters; converters do not depend on an LLM.
