@@ -53,7 +53,7 @@ jobs:
           $d = "$env:RUNNER_TEMP\jt"
           Start-Process dist\pl2pl-Setup-${{ matrix.arch }}.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER","/DIR=$d" -Wait
           & "$d\pl2pl.exe" omp tests\samples\hpc --out "$env:RUNNER_TEMP\out"
-          if (-not (Select-String -Path "$env:RUNNER_TEMP\outec.c" -Pattern "omp parallel for" -Quiet)) { throw "conversion failed" }
+          if (-not (Select-String -Path "$env:RUNNER_TEMP\out\vec.c" -Pattern "omp parallel for" -Quiet)) { throw "conversion failed" }
           Start-Process "$d\unins000.exe" -ArgumentList "/VERYSILENT" -Wait
           if (Test-Path $d) { throw "uninstall left files" }
       - uses: actions/upload-artifact@v4
