@@ -39,7 +39,7 @@ HTML5, CSS3, JavaScript, TypeScript, jQuery, WunderGraph Cosmo, React, Next.js, 
 | Zig / Nim / Crystal | Zap / Jester / Kemal, Lucky | △ |
 | Delphi / Pascal | VCL(UI), Horse | △ |
 | Ada | AWS | △ |
-| Fortran | (no mainstream web framework) | ✕ |
+| Fortran | (no web framework; main source for supercomputer numerical code, added to the main languages 2026-11-18) | ✕ for routes / ◎ as porting source |
 
 ## C. レガシー・業務系 / Legacy and business
 RPG (IBM i) ○, PL/I ○, JCL △ (batch definitions), ABAP (SAP) △, Natural/Adabas △, PowerBuilder △, Visual FoxPro △, Smalltalk △, Excel VBA / Google Apps Script △.

@@ -82,3 +82,8 @@
 - Supercomputer-specific items (my estimate, unverified): MPI, OpenMP, CUDA/HIP, job schedulers (Slurm, PBS, LSF), environment modules, Fortran (rated "not suitable" in the list, but it is a main language on supercomputers; needs reconsideration).
 - Mainframe-specific (same caveat): EBCDIC, fixed-length records, VSAM, CICS, IMS, DB2, JCL, REXX, PL/I, RPG.
 - Open: whether to convert supercomputer-specific parts (MPI, GPU, schedulers) or detect and report only; whether to add Fortran to the main languages.
+
+---
+## 決定: Fortran を主要言語に加える(2026-11-18、所有者) / Decision: add Fortran to the main languages
+**日本語**: 主要言語は **22項目**になる(先の21項目 + Fortran)。スパコン系の変換元として扱う。`docs/LANGUAGES.md` の「Fortran=不向き(✕)」は、サーバー側ルート中心の変換での評価であり、**数値計算コードの移植・変換元としては主要**に改める。方言・版(FORTRAN 77、Fortran 90/95/2003/2008/2018/2023、固定形式/自由形式)と、MPI・OpenMP・CUDA Fortran・coarray の扱いは未決。
+**English**: The main languages become **22** (the earlier 21 + Fortran), treated as a supercomputer-class source. The "Fortran = not suitable" rating in `docs/LANGUAGES.md` was for route-centred server conversion; for numerical-code porting it is **a main source**. Dialects/standards (FORTRAN 77, Fortran 90/95/2003/2008/2018/2023, fixed/free form) and handling of MPI, OpenMP, CUDA Fortran and coarrays are undecided.
