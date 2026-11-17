@@ -1,0 +1,11 @@
+[package]
+name = "pl2pl"
+version = "0.1.0"
+edition = "2021"
+description = "pl2pl: platform / HPC porting converters (COBOL+JCL to Linux, UNIX C to portable C, OpenMP, Kokkos, Numba)"
+license = "MIT"
+
+[dependencies]
+regex = "1"
+walkdir = "2"
+open-cpu = { git = "https://github.com/aon-co-jp/open-cpu" }

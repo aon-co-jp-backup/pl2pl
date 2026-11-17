@@ -1,0 +1,119 @@
+mod cobol;
+mod cport;
+mod gpu;
+mod kokkos;
+mod pyhpc;
+mod loops;
+mod omp;
+mod php;
+mod web;
+mod util;
+
+use std::path::{Path, PathBuf};
+
+const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバーター / platform and HPC porting converters
+
+  pl2pl cobol  <dir|file> --out <dir>        COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash
+  pl2pl cport  <dir|file> --out <dir>        UNIX の C → Windows/Linux で通る C(互換ヘッダー+報告)
+  pl2pl omp    <dir|file> --out <dir>        C/C++ の独立ループへ OpenMP 指示行を付ける
+  pl2pl kokkos <dir|file> --out <dir>        C++ の独立ループを Kokkos へ
+  pl2pl pyhpc  <dir|file> --out <dir> [--mpi]  Python の数値関数へ Numba、--mpi で mpi4py の雛形
+  pl2pl web    <dir> --target <fastapi|mfastapi|rust-poem|rpoem> --out <dir> [--dry-run]
+                                              Java/COBOL/Flask/Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け
+  pl2pl php    <dir> --out <dir> [--target fastapi|mfastapi]   PHP(Laravel/Symfony)のルートを FastAPI の骨組みへ
+  pl2pl gpu    <dir|file> --out <dir> --target <open-cuda|open-directx>   (試作)独立ループから GPU カーネル(.cu / .hlsl)
+  pl2pl doctor                                   open-cpu(同梱)で検出した CPU 情報と、同梱コンポーネントの一覧
+  pl2pl --version
+";
+
+fn arg(a: &[String], k: &str) -> Option<String> {
+    a.iter().position(|x| x == k).and_then(|i| a.get(i + 1).cloned())
+}
+
+fn main() {
+    let a: Vec<String> = std::env::args().collect();
+    let cmd = a.get(1).map(String::as_str).unwrap_or("");
+    if cmd == "--version" || cmd == "-V" {
+        println!("pl2pl {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if cmd == "doctor" {
+        println!("{}", open_cpu::runtime_report());
+        println!("同梱コンポーネント / bundled components: open-cpu(ライブラリとして内蔵)。open-cuda・open-directx(試作の出力先)・aruaru-llm(任意のAI補助、別途導入)は components/README.md を参照");
+        return;
+    }
+    let (Some(input), Some(out)) = (a.get(2).filter(|x| !x.starts_with("--")), arg(&a, "--out")) else {
+        println!("{USAGE}");
+        std::process::exit(if cmd.is_empty() { 0 } else { 2 });
+    };
+    let (input, out) = (PathBuf::from(input), PathBuf::from(out));
+    if !input.exists() {
+        eprintln!("pl2pl: 入力がありません: {}", input.display());
+        std::process::exit(2);
+    }
+    if cmd == "doctor" {
+        println!("{}", open_cpu::runtime_report());
+        println!("同梱コンポーネント / bundled components: open-cpu(ライブラリとして内蔵)。open-cuda・open-directx(試作の出力先)・aruaru-llm(任意のAI補助、別途導入)は components/README.md を参照");
+        return;
+    }
+    if cmd == "web" {
+        let t = arg(&a, "--target").unwrap_or_else(|| "fastapi".into());
+        std::process::exit(web::run(&input, &out, &t, a.iter().any(|x| x == "--dry-run")));
+    }
+    let mut rep: Vec<String> = vec![];
+    if cmd == "php" {
+        let t = arg(&a, "--target").unwrap_or_else(|| "fastapi".into());
+        let files: Vec<(String, String)> = util::files(&input, &["php"]).into_iter().map(|(p, rel)| (rel.to_string_lossy().replace('\\', "/"), util::read(&p))).collect();
+        for (n, c) in php::generate(&files, &t, &mut rep) {
+            let _ = util::write(&out, Path::new(&n), &c);
+        }
+        let _ = util::write_report(&out, "php", &rep);
+        println!("pl2pl php: {} ファイル処理、レポート {} 項目 → {}", files.len(), rep.len(), out.display());
+        return;
+    }
+    let n = match cmd {
+        "cobol" => run(&input, &out, &["cbl", "cob", "cobol", "cpy", "jcl"], &mut rep, cobol::convert),
+        "cport" => run(&input, &out, &["c", "h"], &mut rep, cport::convert),
+        "kokkos" => run(&input, &out, &["cc", "cpp", "cxx", "hpp"], &mut rep, kokkos::convert),
+        "pyhpc" => {
+            let mpi = a.iter().any(|x| x == "--mpi");
+            run(&input, &out, &["py"], &mut rep, |s, n, r| pyhpc::convert(s, n, r, mpi))
+        }
+        "gpu" => {
+            let t = arg(&a, "--target").unwrap_or_else(|| "open-cuda".into());
+            run(&input, &out, &["c", "cc", "cpp", "cxx"], &mut rep, |s, n, r| gpu::convert(s, n, r, &t))
+        }
+        "omp" => run(&input, &out, &["c", "cc", "cpp", "cxx", "h", "hpp"], &mut rep, omp::convert),
+        _ => {
+            println!("{USAGE}");
+            std::process::exit(2);
+        }
+    };
+    if cmd == "cport" {
+        let _ = util::write(&out, Path::new("pl2pl_compat.h"), cport::COMPAT_H);
+    }
+    if cmd == "pyhpc" && a.iter().any(|x| x == "--mpi") {
+        let _ = util::write(&out, Path::new("mpi_scaffold.py"), pyhpc::MPI_SCAFFOLD);
+    }
+    if cmd == "cobol" {
+        let _ = util::write(&out, Path::new("build.sh"), &cobol::build_script(&out));
+    }
+    let _ = util::write_report(&out, cmd, &rep);
+    println!("pl2pl {cmd}: {n} ファイル処理、レポート {} 項目 → {}", rep.len(), out.display());
+}
+
+fn run<F: FnMut(&str, &str, &mut Vec<String>) -> Vec<(String, String)>>(input: &Path, out: &Path, exts: &[&str], rep: &mut Vec<String>, mut f: F) -> usize {
+    let fs = util::files(input, exts);
+    for (p, rel) in &fs {
+        let src = util::read(p);
+        let name = rel.to_string_lossy().replace('\\', "/");
+        for (rn, content) in f(&src, &name, rep) {
+            // rn が空なら元の相対パス、そうでなければ同じディレクトリ内の別名
+            let target = if rn.is_empty() { rel.clone() } else { rel.parent().map(|d| d.join(&rn)).unwrap_or_else(|| PathBuf::from(&rn)) };
+            if let Err(e) = util::write(out, &target, &content) {
+                eprintln!("pl2pl: 書き出せません {}: {e}", target.display());
+            }
+        }
+    }
+    fs.len()
+}

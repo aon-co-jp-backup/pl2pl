@@ -21,3 +21,9 @@
 - 主要OS=メインフレーム・UNIX・Linux・Windows・Mac。主要言語21項目(ACCESS〜Rust)の相互変換を想定(全部は載せない)。詳細 docs/DESIGN.md / Main OSes and 21 main languages, both-way conversion assumed; details in docs/DESIGN.md.
 
 - 組み合わせ(OS×言語・モデル)・既存ツールの現状・優先フレームワーク・最初の変換案は `docs/COMBINATIONS.md` / OS combinations, existing-tool status, priorities and first pairs are in `docs/COMBINATIONS.md`.
+
+## 実装メモ(2026-11-18) / Implementation notes
+- Rust CLI(`src/`): `loops.rs`(独立ループの保守的判定)を `omp`/`kokkos`/`gpu` が共有。`cobol.rs`(JCL→bash 含む)、`cport.rs`、`pyhpc.rs`、`php.rs`、`web.rs`(既存変換器への振り分け)。open-cpu は git 依存で内蔵。
+- 判定は保守的: 依存・副作用の恐れがあれば**付けずに理由を報告**する。性能は保証しない。
+- WSL で試験: `wsl -d Ubuntu -- bash /mnt/f/pl2pl/tests/run-all.sh`(`bash -c` に `$PATH` を書くとホスト側で展開される)。Windows の Git Bash では heredoc の `\` が消えることがあるので Rust ソースは Write ツールで書く。
+- 同梱の実態は `components/README.md`(open-cpu のみバイナリ内。open-cuda/open-directx は試作の出力先、aruaru-llm は未連携)。

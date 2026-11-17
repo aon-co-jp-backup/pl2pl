@@ -28,3 +28,18 @@ Common shape: detect input → extract routes/types → four targets → convers
 The full list (languages, frameworks, databases, UI) is in [`docs/LANGUAGES.md`](docs/LANGUAGES.md). The first language is still being chosen (suggestion: PHP; runners-up Go / Kotlin; databases as a separate line, SQL dialects → aruaru-db).
 
 組み合わせ表と優先フレームワークは[`docs/COMBINATIONS.md`](docs/COMBINATIONS.md)。 / OS combinations and priority frameworks: [`docs/COMBINATIONS.md`](docs/COMBINATIONS.md).
+
+## 実装済みのコマンド(2026-11-18、`src/`) / Implemented commands
+| コマンド | 内容 | 検証 |
+|---|---|---|
+| `pl2pl cobol` | COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash。DD名→`DD_xxx`、非互換の検出 | GnuCOBOL で実際にビルド・実行(JCL 経由) |
+| `pl2pl omp` | C/C++ の独立ループへ `#pragma omp parallel for`(和の縮約つき) | 元のコードと同じ結果 |
+| `pl2pl php` | Laravel / Symfony のルート → FastAPI の骨組み(本体は TODO) | TestClient で実行 |
+| `pl2pl web` | Java / COBOL / Flask・Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け | 単体試験(振り分け計画) |
+| `pl2pl cport` | UNIX の C → 互換ヘッダー+機械置換+移植の指針(fork・socket 等は報告) | gcc でビルド・実行 |
+| `pl2pl pyhpc` | Python の数値関数へ Numba `@njit`、`--mpi` で mpi4py 雛形 | 単体試験(Numba 実行は確認中) |
+| `pl2pl kokkos` | 独立ループ → Kokkos(`parallel_for` / 和の `parallel_reduce`) | 出力のみ(Kokkos 未導入) |
+| `pl2pl gpu` | (試作)独立ループ → CUDA 形式 `.cu` / HLSL `.hlsl` | 出力のみ(open-cuda/open-directx 未実行) |
+| `pl2pl doctor` | open-cpu(内蔵)の CPU 情報 | 実行確認 |
+同梱コンポーネントは [`components/README.md`](components/README.md)。試験は `bash tests/run-all.sh`(WSL)。
+Implemented commands above; bundled components in `components/README.md`; tests via `bash tests/run-all.sh` (WSL).

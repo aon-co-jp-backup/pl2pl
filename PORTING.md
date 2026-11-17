@@ -16,3 +16,7 @@
 **最新の想定 / Latest assumption**: 主要OS=メインフレーム・UNIX・Linux・Windows・Mac、主要言語21項目の相互変換(`docs/DESIGN.md` 末尾)。直前の主要変換元の一覧はこれで置き換え。 / Main OSes and 21 languages, both-way (end of `docs/DESIGN.md`); replaces the previous priority list.
 
 **2026-11-18**: `docs/COMBINATIONS.md` を追加(OS×言語・モデル表、既存ツール、優先フレームワーク、最初の変換案)。次: 最初の変換の組み合わせを選ぶ。 / Added `docs/COMBINATIONS.md`; next: choose the first conversion pair.
+
+## 実装の到達点(2026-11-18) / Implementation status
+**日本語**: 4案(COBOL→Linux、OpenMP、PHP→FastAPI、既存変換器への入口 `web`)と、cport・pyhpc・kokkos・gpu(試作)・doctor を実装。実機確認済み=COBOL(JCL経由)、OpenMP(同一結果)、PHP(TestClient)、cport(gcc)。**未確認**: Numba の実行(WSL の venv 作成が長引いた)、Kokkos のビルド、open-cuda/open-directx 上でのカーネル実行、`web` の実行(振り分け計画の単体試験のみ)。**未実装**: aruaru-llm との連携、リリース用インストーラー/CI、Java・COBOL→FastAPI/Poem の本体強化、PHP の本体変換。
+**English**: Implemented the four chosen pairs plus cport, pyhpc, kokkos, gpu (prototype) and doctor. Verified for real: COBOL via JCL, OpenMP (same result), PHP (TestClient), cport (gcc). **Unverified**: Numba execution, Kokkos build, kernels on open-cuda/open-directx, `web` execution (plan unit-tested only). **Not implemented**: aruaru-llm wiring, release installers/CI, deeper Java/COBOL conversion, PHP bodies.
