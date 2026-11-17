@@ -22,3 +22,22 @@
 3. **Start and exit per request**: conversions run as short-lived processes with caps on concurrency, timeout and input size (same idea as the shared-base admission control; see the deployment policy in `runo/CLAUDE.md`).
 4. **Add one at a time**: a new source is added by one line in a registry (name, executable, supported targets).
 5. Open: registry format, executable location, sandboxing (separate user, resource limits), upload limit, result retention.
+
+---
+## 訂正・決定事項(2026-11-18、所有者。上の「WEB版が変換器を呼び出す」案を置き換える) / Correction (supersedes the previous web-calls-converters idea)
+**日本語**
+1. **WEB版は変換しない**: WEB版は pl2pl の**ダウンロードと説明書(世界中の言語)の提示だけ**。変換器はWEB側で常駐も起動もしない。
+2. **変換はPCにインストールしたアプリで行う**: 起動するとファイルエクスプローラー(フォルダ選択)が開き、変換元のディレクトリの**一番上(プロジェクトの親フォルダ等)を複数指定**できる。
+3. **自動判定**: 変換元のプログラム言語・フレームワーク・プロジェクト名・管理関連ファイル(ビルド設定等)を自動で判定する(COBOL_to / Java_to と同じ流儀)。
+4. **変換先を指定**: 変換先の言語・フレームワーク・DB などを利用者が選ぶ。
+5. **全部は載せない方針は維持**: 一覧から選んだものだけ実装(個人運営で全組み合わせは現実的でない)。
+6. **主要な変換元(最優先)**: OSACCESS(※表記のとおり記録。「OS」と「ACCESS」の区切りか別製品か要確認)、ACCESS VBA、VB、VB.NET、VBA、C、C++、C#.NET、COBOL。
+7. 未決: アプリの形(デスクトップGUI / CLI+ダイアログ。COBOL_to は rfd のフォルダ選択)、登録表、各言語の判定ルール、変換先の組み合わせ表、WEB側の多言語説明書の言語数。
+**English**
+1. **The web version does not convert**: it only offers **downloads and the manual in many languages**. No converter runs or stays resident on the web side.
+2. **Conversion runs in the installed PC app**: on start it opens a file explorer (folder picker) where the user can specify **several top-level directories** (e.g. parent folders of projects).
+3. **Auto-detection** of source language, framework, project name and management/build files (same style as COBOL_to / Java_to).
+4. **The user chooses the target** language, framework, DB, etc.
+5. **Still not exhaustive**: only entries chosen from the list are implemented.
+6. **Priority sources**: OSACCESS (recorded as written; unclear whether "OS" + "ACCESS" or a separate product — to confirm), Access VBA, VB, VB.NET, VBA, C, C++, C#.NET, COBOL.
+7. Open: app form (desktop GUI vs CLI + dialog; COBOL_to uses an rfd folder picker), registry, detection rules per language, target combination table, number of languages for the web manual.

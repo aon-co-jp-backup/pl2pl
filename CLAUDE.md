@@ -12,6 +12,8 @@
 - Existing repositories stay as they are; no destructive merge.
 - Created first as `pg2pg`, deleted at the owner's request and renamed `pl2pl` (2026-11-18).
 
-## 決定事項(2026-11-18、所有者) / Decisions
+## 訂正(2026-11-18、所有者): WEB版は変換しない。ダウンロードと多言語の説明書のみ。変換はPCのインストール型アプリ(フォルダ選択を複数・自動判定・変換先指定)。主要変換元=OSACCESS・ACCESS VBA・VB・VB.NET・VBA・C・C++・C#.NET・COBOL。詳細 docs/DESIGN.md / Correction: the web version only offers downloads and manuals; conversion runs in the installed PC app. Details in docs/DESIGN.md.
+
+## 以前の決定(上の訂正で置き換え) / Superseded decisions
 - 日本語: 全組み合わせは作らない。一覧から選んだものだけ実装して完成とする。WEB版は変換器を常駐させず、ディスク上の実行ファイルを要求ごとに起動して結果を返す(メモリー節約)。詳細は `docs/DESIGN.md`。
 - English: Do not build every combination; implement only the chosen ones. The web version never keeps converters resident; it starts the on-disk executable per request. Details in `docs/DESIGN.md`.
