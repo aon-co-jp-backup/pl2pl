@@ -22,3 +22,7 @@ Common shape: detect input → extract routes/types → four targets → convers
 ## 方針案 / Draft direction (未確定 / undecided)
 - 共通の中間表現(IR: ルート・型・関数本体)を作り、各 `X_to` を「入力側フロントエンド」、4種の出力を「バックエンド」として分ける(N×M を N+M に)。
 - 既存リポジトリは当面そのまま残し、pl2pl が成熟してから取り込む(破壊的な統合はしない)。
+
+## 変換元の候補一覧 / Source candidates
+言語・フレームワーク・DB・画面側を網羅した一覧は[`docs/LANGUAGES.md`](docs/LANGUAGES.md)。最初に変換する言語は選定中(案: PHP、次点 Go / Kotlin、DBは別線で SQL 方言 → aruaru-db)。
+The full list (languages, frameworks, databases, UI) is in [`docs/LANGUAGES.md`](docs/LANGUAGES.md). The first language is still being chosen (suggestion: PHP; runners-up Go / Kotlin; databases as a separate line, SQL dialects → aruaru-db).
