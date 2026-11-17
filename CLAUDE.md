@@ -11,3 +11,7 @@
 - Three IR families expected: server side, DB/SQL, UI side (RPoem Rust→WASM).
 - Existing repositories stay as they are; no destructive merge.
 - Created first as `pg2pg`, deleted at the owner's request and renamed `pl2pl` (2026-11-18).
+
+## 決定事項(2026-11-18、所有者) / Decisions
+- 日本語: 全組み合わせは作らない。一覧から選んだものだけ実装して完成とする。WEB版は変換器を常駐させず、ディスク上の実行ファイルを要求ごとに起動して結果を返す(メモリー節約)。詳細は `docs/DESIGN.md`。
+- English: Do not build every combination; implement only the chosen ones. The web version never keeps converters resident; it starts the on-disk executable per request. Details in `docs/DESIGN.md`.

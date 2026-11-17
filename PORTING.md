@@ -7,5 +7,7 @@
 2. `docs/DESIGN.md` の各節(目的・IR・入出力・取り込み順)を所有者が書く。/ The owner fills in DESIGN.md.
 3. 共通IRの試作(COBOL_to・Java_to のコードから共通部分を抽出)。/ Prototype a shared IR from COBOL_to and Java_to.
 4. 一覧の最新性の検証(検索)。/ Verify the list is current.
+## 決定済み(WEB版の方針) / Decided (web version)
+日本語: 全部は網羅せず、選んだものだけ実装。WEB版はHDD上の変換器を要求ごとに呼び出す(常駐させない)。`docs/DESIGN.md` 参照。 / English: Not exhaustive; only chosen entries. The web version calls on-disk converters per request (not resident). See `docs/DESIGN.md`.
 ## 再開用メッセージ / Resume message
 「F:\pl2pl を再開。docs/LANGUAGES.md の一覧を見て、最初に変換する言語を決める。決まったら DESIGN.md に所有者の指示どおり追記。」
