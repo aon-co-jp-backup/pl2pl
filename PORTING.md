@@ -22,3 +22,5 @@
 **English**: Implemented the four chosen pairs plus cport, pyhpc, kokkos, gpu (prototype) and doctor. Verified for real: COBOL via JCL, OpenMP (same result), PHP (TestClient), cport (gcc). **Unverified**: Numba execution, Kokkos build, kernels on open-cuda/open-directx, `web` execution (plan unit-tested only). **Not implemented**: aruaru-llm wiring, release installers/CI, deeper Java/COBOL conversion, PHP bodies.
 
 **2026-11-18 追記**: `pl2pl llm setup/start` と `installer/bundle-components.sh` を追加(aruaru-llm を同梱し、モデルは空きメモリに合わせて自動導入。重みは同梱しない)。実導入は未確認。 / Added `llm setup/start` and `bundle-components.sh`; weights are not bundled; a real install is unverified.
+
+**2026-11-18 追記**: `v0.1.0` を公開。Windows x64/ARM64 exe・Linux amd64/arm64 deb+tar.gz・macOS arm64/x64 pkg(未署名)を CI が作り、インストール→実行→削除の試験が全て成功(Linux 側は COBOL+JCL 実行・OpenMP 同一結果・cport・PHP→FastAPI の通し試験も成功)。 / `v0.1.0` released; all OS installers built and smoke-tested in CI.
