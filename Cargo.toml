@@ -8,4 +8,6 @@ license = "MIT"
 [dependencies]
 regex = "1"
 walkdir = "2"
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+ureq = "2"
 open-cpu = { git = "https://github.com/aon-co-jp/open-cpu" }

@@ -10,3 +10,15 @@
 ## 正直な注記 / Honest notes
 - 「同梱」は、open-cpu だけが実際にバイナリへ入っています。他の3つは「出力先」または「別途導入」です。 / Only open-cpu is actually inside the binary; the other three are output targets or separate installs.
 - カーネルは要素型を `float` と仮定し、縮約(和)は出力しません。 / Kernels assume `float` and do not emit reductions.
+
+## aruaru-llm の同梱とモデルの自動導入(2026-11-18、所有者の決定) / Bundling aruaru-llm and automatic model install
+**日本語**
+- **同梱するもの**: aruaru-llm の実行ファイル(公開リリース `aruaru-llm-linux-x86_64.tar.gz` / `aruaru-llm-windows-x86_64.zip`)。配布物を作る前に `bash installer/bundle-components.sh <linux|windows>` で `components/bin/` へ取り込む。**モデルの重みは同梱しない**(GB級のため)。
+- **モデルは自動導入**: `pl2pl llm setup` が空きメモリを調べ、aruaru-llm のカタログ(Qwen2.5)から合うものを選ぶ(空き ≥ 重みの約2.5倍の見積もり: 3B=約6.2GB、1.5B=約2.9GB、0.5B=約0.9GB。足りなければ最小+警告)。同梱の aruaru-llm が動いていなければ 127.0.0.1:4600 で自動起動し、`QwenInstall` → `QwenSelect` を呼ぶ。`--dry-run` で選択だけ確認、`--model <id>` で指定。
+- **ダウンロードは `llm setup` を実行したときだけ**。変換コマンド(cobol・omp 等)は何もダウンロードしない。
+- **未確認**: 同梱版を実際に起動しての導入(`QwenInstall` の実呼び出し)。選択ロジックと `--dry-run` は確認済み。空きメモリ 2.5 倍は私の見積もりで実測していない。
+**English**
+- **Bundled**: the aruaru-llm executable (public release assets). Pull it into `components/bin/` with `bash installer/bundle-components.sh <linux|windows>` before building a distribution. **Model weights are not bundled** (GB-scale).
+- **Models install automatically**: `pl2pl llm setup` checks free memory and picks a fitting model from aruaru-llm's Qwen2.5 catalog (free memory >= about 2.5x the weights, my estimate; smallest plus a warning if short). If the bundled aruaru-llm is not running it starts it on 127.0.0.1:4600, then calls `QwenInstall` and `QwenSelect`. `--dry-run` shows the choice only; `--model <id>` forces one.
+- **Downloads happen only when `llm setup` is run.** The conversion commands download nothing.
+- **Unverified**: a real install against the bundled binary (`QwenInstall`). The selection logic and `--dry-run` are verified; the 2.5x factor is an unmeasured estimate.

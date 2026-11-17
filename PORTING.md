@@ -20,3 +20,5 @@
 ## 実装の到達点(2026-11-18) / Implementation status
 **日本語**: 4案(COBOL→Linux、OpenMP、PHP→FastAPI、既存変換器への入口 `web`)と、cport・pyhpc・kokkos・gpu(試作)・doctor を実装。実機確認済み=COBOL(JCL経由)、OpenMP(同一結果)、PHP(TestClient)、cport(gcc)。**未確認**: Numba の実行(WSL の venv 作成が長引いた)、Kokkos のビルド、open-cuda/open-directx 上でのカーネル実行、`web` の実行(振り分け計画の単体試験のみ)。**未実装**: aruaru-llm との連携、リリース用インストーラー/CI、Java・COBOL→FastAPI/Poem の本体強化、PHP の本体変換。
 **English**: Implemented the four chosen pairs plus cport, pyhpc, kokkos, gpu (prototype) and doctor. Verified for real: COBOL via JCL, OpenMP (same result), PHP (TestClient), cport (gcc). **Unverified**: Numba execution, Kokkos build, kernels on open-cuda/open-directx, `web` execution (plan unit-tested only). **Not implemented**: aruaru-llm wiring, release installers/CI, deeper Java/COBOL conversion, PHP bodies.
+
+**2026-11-18 追記**: `pl2pl llm setup/start` と `installer/bundle-components.sh` を追加(aruaru-llm を同梱し、モデルは空きメモリに合わせて自動導入。重みは同梱しない)。実導入は未確認。 / Added `llm setup/start` and `bundle-components.sh`; weights are not bundled; a real install is unverified.

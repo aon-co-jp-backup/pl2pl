@@ -3,6 +3,7 @@ mod cport;
 mod gpu;
 mod kokkos;
 mod pyhpc;
+mod llm;
 mod loops;
 mod omp;
 mod php;
@@ -23,6 +24,9 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl php    <dir> --out <dir> [--target fastapi|mfastapi]   PHP(Laravel/Symfony)のルートを FastAPI の骨組みへ
   pl2pl gpu    <dir|file> --out <dir> --target <open-cuda|open-directx>   (試作)独立ループから GPU カーネル(.cu / .hlsl)
   pl2pl doctor                                   open-cpu(同梱)で検出した CPU 情報と、同梱コンポーネントの一覧
+  pl2pl llm setup [--url http://127.0.0.1:4600] [--model <id>] [--dry-run]
+                                              この PC のメモリに合う aruaru-llm のモデルを自動選択して導入(実行したときだけダウンロード)
+  pl2pl llm start [--url ...]                  同梱の aruaru-llm を 127.0.0.1 で起動(動いていれば何もしない)
   pl2pl --version
 ";
 
@@ -40,6 +44,21 @@ fn main() {
     if cmd == "doctor" {
         println!("{}", open_cpu::runtime_report());
         println!("同梱コンポーネント / bundled components: open-cpu(ライブラリとして内蔵)。open-cuda・open-directx(試作の出力先)・aruaru-llm(任意のAI補助、別途導入)は components/README.md を参照");
+        return;
+    }
+    if cmd == "llm" && a.get(2).map(String::as_str) == Some("setup") {
+        let url = arg(&a, "--url").unwrap_or_else(|| "http://127.0.0.1:4600".into());
+        std::process::exit(llm::setup(&url, a.iter().any(|x| x == "--dry-run"), arg(&a, "--model").as_deref()));
+    }
+    if cmd == "llm" && a.get(2).map(String::as_str) == Some("start") {
+        let url = arg(&a, "--url").unwrap_or_else(|| "http://127.0.0.1:4600".into());
+        match llm::ensure_running(&url) {
+            Ok(()) => println!("aruaru-llm は {url} で動いています"),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
         return;
     }
     let (Some(input), Some(out)) = (a.get(2).filter(|x| !x.starts_with("--")), arg(&a, "--out")) else {

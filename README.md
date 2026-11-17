@@ -40,6 +40,7 @@ The full list (languages, frameworks, databases, UI) is in [`docs/LANGUAGES.md`]
 | `pl2pl pyhpc` | Python の数値関数へ Numba `@njit`、`--mpi` で mpi4py 雛形 | 単体試験(Numba 実行は確認中) |
 | `pl2pl kokkos` | 独立ループ → Kokkos(`parallel_for` / 和の `parallel_reduce`) | 出力のみ(Kokkos 未導入) |
 | `pl2pl gpu` | (試作)独立ループ → CUDA 形式 `.cu` / HLSL `.hlsl` | 出力のみ(open-cuda/open-directx 未実行) |
+| `pl2pl llm setup` / `llm start` | 同梱の aruaru-llm を起動し、空きメモリに合うモデル(Qwen2.5)を自動選択して導入 | 選択ロジックと --dry-run のみ(実導入は未確認) |
 | `pl2pl doctor` | open-cpu(内蔵)の CPU 情報 | 実行確認 |
 同梱コンポーネントは [`components/README.md`](components/README.md)。試験は `bash tests/run-all.sh`(WSL)。
 Implemented commands above; bundled components in `components/README.md`; tests via `bash tests/run-all.sh` (WSL).
