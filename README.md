@@ -26,3 +26,5 @@ Common shape: detect input → extract routes/types → four targets → convers
 ## 変換元の候補一覧 / Source candidates
 言語・フレームワーク・DB・画面側を網羅した一覧は[`docs/LANGUAGES.md`](docs/LANGUAGES.md)。最初に変換する言語は選定中(案: PHP、次点 Go / Kotlin、DBは別線で SQL 方言 → aruaru-db)。
 The full list (languages, frameworks, databases, UI) is in [`docs/LANGUAGES.md`](docs/LANGUAGES.md). The first language is still being chosen (suggestion: PHP; runners-up Go / Kotlin; databases as a separate line, SQL dialects → aruaru-db).
+
+組み合わせ表と優先フレームワークは[`docs/COMBINATIONS.md`](docs/COMBINATIONS.md)。 / OS combinations and priority frameworks: [`docs/COMBINATIONS.md`](docs/COMBINATIONS.md).
