@@ -1,0 +1,129 @@
+name: release
+# Pushing a v* tag builds each OS installer, smoke-tests it (install -> run -> remove) and attaches it to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Tools (GnuCOBOL, gcc, fastapi)
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gnucobol gcc
+          pip install fastapi httpx
+      - name: End-to-end (COBOL+JCL run, OpenMP same result, cport, PHP to FastAPI)
+        run: bash tests/ci.sh
+
+  windows:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-latest, arch: x64, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          $iscc = if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") { "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" } else { (Get-Command iscc).Source }
+          $ver = "${{ github.ref_name }}".TrimStart('v'); if ($ver -notmatch '^\d') { $ver = "0.0.0" }
+          & $iscc /Q "/DAppVersion=$ver" "/DArch=${{ matrix.arch }}" "/DExeDir=..\target\${{ matrix.target }}\release" installer\pl2pl.iss
+      - name: Smoke test (install, run, uninstall)
+        shell: pwsh
+        run: |
+          $d = "$env:RUNNER_TEMP\jt"
+          Start-Process dist\pl2pl-Setup-${{ matrix.arch }}.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER","/DIR=$d" -Wait
+          & "$d\pl2pl.exe" omp tests\samples\hpc --out "$env:RUNNER_TEMP\out"
+          if (-not (Select-String -Path "$env:RUNNER_TEMP\outec.c" -Pattern "omp parallel for" -Quiet)) { throw "conversion failed" }
+          Start-Process "$d\unins000.exe" -ArgumentList "/VERYSILENT" -Wait
+          if (Test-Path $d) { throw "uninstall left files" }
+      - uses: actions/upload-artifact@v4
+        with: { name: "win-${{ matrix.arch }}", path: dist/*.exe }
+
+  linux:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Package
+        run: |
+          ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
+          bash installer/build-deb.sh target/release/pl2pl "$ver" ${{ matrix.arch }} dist
+          tar czf "dist/pl2pl-$ver-linux-${{ matrix.arch }}.tar.gz" -C target/release pl2pl -C ../.. README.md LICENSE
+      - name: Smoke test (install, run, remove)
+        run: |
+          sudo dpkg -i dist/*.deb
+          pl2pl omp tests/samples/hpc --out "$RUNNER_TEMP/out"
+          grep -q "omp parallel for" "$RUNNER_TEMP/out/vec.c"
+          sudo dpkg -r pl2pl
+          hash -r; test ! -e /usr/bin/pl2pl
+      - uses: actions/upload-artifact@v4
+        with: { name: "linux-${{ matrix.arch }}", path: "dist/*" }
+
+  macos:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, arch: arm64, target: aarch64-apple-darwin }
+          - { runner: macos-15-intel, arch: x64, target: x86_64-apple-darwin }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package (.pkg, unsigned)
+        run: |
+          ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
+          bash installer/build-pkg.sh target/${{ matrix.target }}/release/pl2pl "$ver" ${{ matrix.arch }} dist
+      - name: Smoke test (install, run)
+        run: |
+          sudo installer -pkg dist/*.pkg -target /
+          /usr/local/bin/pl2pl omp tests/samples/hpc --out "$RUNNER_TEMP/out"
+          grep -q "omp parallel for" "$RUNNER_TEMP/out/vec.c"
+      - uses: actions/upload-artifact@v4
+        with: { name: "macos-${{ matrix.arch }}", path: dist/*.pkg }
+
+  publish:
+    needs: [windows, linux, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: SHA-256 and Release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cd out && sha256sum * > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "Installers per OS. SHA-256: SHA256SUMS.txt" *
