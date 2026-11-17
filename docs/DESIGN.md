@@ -87,3 +87,8 @@
 ## 決定: Fortran を主要言語に加える(2026-11-18、所有者) / Decision: add Fortran to the main languages
 **日本語**: 主要言語は **22項目**になる(先の21項目 + Fortran)。スパコン系の変換元として扱う。`docs/LANGUAGES.md` の「Fortran=不向き(✕)」は、サーバー側ルート中心の変換での評価であり、**数値計算コードの移植・変換元としては主要**に改める。方言・版(FORTRAN 77、Fortran 90/95/2003/2008/2018/2023、固定形式/自由形式)と、MPI・OpenMP・CUDA Fortran・coarray の扱いは未決。
 **English**: The main languages become **22** (the earlier 21 + Fortran), treated as a supercomputer-class source. The "Fortran = not suitable" rating in `docs/LANGUAGES.md` was for route-centred server conversion; for numerical-code porting it is **a main source**. Dialects/standards (FORTRAN 77, Fortran 90/95/2003/2008/2018/2023, fixed/free form) and handling of MPI, OpenMP, CUDA Fortran and coarrays are undecided.
+
+---
+## 追記: スパコン言語は「変換先」にもなる(2026-11-18、所有者) / Supercomputer languages are also conversion targets
+**日本語**: 変換先にスパコン向けの言語・モデルも含める(例: 通常のC/COBOL/Python/Java → MPI+OpenMP の C/C++/Fortran、GPU向けCUDA/HIP/SYCL など)。一覧は `docs/LANGUAGES.md` の「G. スパコン・HPC」。ただし自動で並列化の最適解を作るのは難しいため、**まず逐次コードの移植と、並列化の定型パターン(ループのOpenMP化・配列のGPU転送など)の提案**にとどめ、性能の保証はしない方針案(未決)。
+**English**: Supercomputer-oriented languages and models are also conversion **targets** (e.g. plain C/COBOL/Python/Java -> C/C++/Fortran with MPI + OpenMP, or GPU code in CUDA/HIP/SYCL). See "G. Supercomputer / HPC" in `docs/LANGUAGES.md`. Automatically producing an optimal parallelisation is hard, so the draft policy (undecided) is to **port serial code first and suggest standard parallel patterns** (OpenMP loops, GPU data transfer, ...) with no performance guarantee.

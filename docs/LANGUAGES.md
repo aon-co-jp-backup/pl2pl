@@ -59,3 +59,20 @@ GraphQL (Apollo, Hasura), gRPC/protobuf, SOAP/WSDL, OpenAPI (spec → code), Ter
 
 ## 最初の候補 / Candidate for the first one (suggestion, undecided)
 PHP (same four targets as existing tools, plenty of real projects, legacy demand in Japan, a third language to extract a shared IR). Runners-up: Go or Kotlin (route-centred); SQL dialects → aruaru-db as a separate line.
+
+## G. スパコン・HPC(Fortran 以外) / Supercomputer / HPC beyond Fortran (2026-11-18)
+知識に基づく一覧(最新性は未検証)。変換元にも変換先にもなりうる。*Knowledge-based, not freshly verified; usable as source or target.*
+
+| 区分 Kind | 言語・モデル Languages / models |
+|---|---|
+| 汎用言語 General | C, C++ (主力 / the mainstay), Python (NumPy, SciPy, mpi4py, Dask), Julia, Rust (増加中 / growing), Java (限定的 / limited), R, MATLAB/Octave, Mojo (新興 / emerging) |
+| 分散メモリ Distributed | MPI, OpenSHMEM, Global Arrays, Charm++ |
+| 共有メモリ・指示行 Shared memory / directives | OpenMP (offload を含む / incl. offload), OpenACC, Intel TBB, Cilk |
+| GPU・アクセラレータ | CUDA, HIP (ROCm), SYCL / oneAPI DPC++, OpenCL, Triton, Thrust, Halide |
+| 性能可搬層 Portability layers | Kokkos, RAJA, Legion, HPX, StarPU, PaRSEC |
+| PGAS 系 | Chapel, UPC / UPC++, X10, Titanium, Coarray Fortran, XcalableMP(日本発 / from Japan) |
+| 歴史的 Historical | High Performance Fortran (HPF, 地球シミュレータ世代 / Earth Simulator era), Fortran 77 |
+| Python 系の並列 | Legate / cuNumeric, JAX, Numba |
+| ジョブ・環境 Jobs and environment | Slurm, PBS, LSF, Flux, Spack, EasyBuild, Apptainer, CMake, 環境モジュール / environment modules |
+
+注 / Note: 日本の京・富岳系(Fujitsu コンパイラ、A64FX/ARM SVE)、地球シミュレータ系(NEC SX、ベクトル化指示行)は機種固有の指示行があり、一般のモデルとは別扱いが要る可能性(要調査・未検証)。
