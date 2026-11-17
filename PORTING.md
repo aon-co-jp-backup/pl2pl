@@ -12,3 +12,5 @@
 日本語: 全部は網羅せず、選んだものだけ実装。WEB版はHDD上の変換器を要求ごとに呼び出す(常駐させない)。`docs/DESIGN.md` 参照。 / English: Not exhaustive; only chosen entries. The web version calls on-disk converters per request (not resident). See `docs/DESIGN.md`.
 ## 再開用メッセージ / Resume message
 「F:\pl2pl を再開。docs/LANGUAGES.md の一覧を見て、最初に変換する言語を決める。決まったら DESIGN.md に所有者の指示どおり追記。」
+
+**最新の想定 / Latest assumption**: 主要OS=メインフレーム・UNIX・Linux・Windows・Mac、主要言語21項目の相互変換(`docs/DESIGN.md` 末尾)。直前の主要変換元の一覧はこれで置き換え。 / Main OSes and 21 languages, both-way (end of `docs/DESIGN.md`); replaces the previous priority list.

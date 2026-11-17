@@ -17,3 +17,5 @@
 ## 以前の決定(上の訂正で置き換え) / Superseded decisions
 - 日本語: 全組み合わせは作らない。一覧から選んだものだけ実装して完成とする。WEB版は変換器を常駐させず、ディスク上の実行ファイルを要求ごとに起動して結果を返す(メモリー節約)。詳細は `docs/DESIGN.md`。
 - English: Do not build every combination; implement only the chosen ones. The web version never keeps converters resident; it starts the on-disk executable per request. Details in `docs/DESIGN.md`.
+
+- 主要OS=メインフレーム・UNIX・Linux・Windows・Mac。主要言語21項目(ACCESS〜Rust)の相互変換を想定(全部は載せない)。詳細 docs/DESIGN.md / Main OSes and 21 main languages, both-way conversion assumed; details in docs/DESIGN.md.

@@ -41,3 +41,18 @@
 5. **Still not exhaustive**: only entries chosen from the list are implemented.
 6. **Priority sources**: OSACCESS (recorded as written; unclear whether "OS" + "ACCESS" or a separate product — to confirm), Access VBA, VB, VB.NET, VBA, C, C++, C#.NET, COBOL.
 7. Open: app form (desktop GUI vs CLI + dialog; COBOL_to uses an rfd folder picker), registry, detection rules per language, target combination table, number of languages for the web manual.
+
+---
+## 主要OS・主要言語の想定(2026-11-18、所有者。直前の「主要な変換元」を置き換える) / Assumed main OSes and languages (supersedes the previous priority list)
+**日本語**
+- **主要OS**: メインフレーム、UNIX、Linux、Windows、Mac。(これにより、直前の「OSACCESS」は「OS」と「ACCESS」の区切りだったと解釈する。所有者に未確認。)
+- **主要言語(21項目、表記は所有者のまま)**: ACCESS、ACCESS VBA、VB、VB.NET、VBA、EXCEL VBA、C、C++、C#.NET、F#、F#.NET、COBOL、Perl、PHP、Python、Ruby、Java、JavaScript、TypeScript、Go、Rust。
+- **相互変換を想定**: 各言語の有名なフレームワークとDATABASEも含め、双方向に変換できる形を想定(あくまで想定。全部は載せない方針は維持)。
+- **設計上の注意(私の見積もり)**: 21言語を総当たりで相互変換すると向きを区別して 21×20 = 420 通り。個別に作らず、共通の中間表現(IR)を挟み「入力側21+出力側21」で済ませる案が現実的。ただし言語の性質が大きく違う(ACCESS=DB・画面・VBAが一体、COBOL=手続き+帳票、Rust=所有権)ため、IRで表せない部分は `TODO` として残す方針(既存ツールと同じ)。
+- **OSの意味**: 変換元/先の言語に加え、動作OS(JCL・UNIXシェル・Windows API・Macなど)への移植も含めるのか、インストール型アプリの対応OSだけを指すのかは未決。
+**English**
+- **Main OSes**: mainframe, UNIX, Linux, Windows, Mac. (So the earlier "OSACCESS" is read as "OS" + "ACCESS"; not yet confirmed with the owner.)
+- **Main languages (21, as written by the owner)**: Access, Access VBA, VB, VB.NET, VBA, Excel VBA, C, C++, C#.NET, F#, F#.NET, COBOL, Perl, PHP, Python, Ruby, Java, JavaScript, TypeScript, Go, Rust.
+- **Mutual (both-way) conversion assumed**, including each language's well-known frameworks and databases. Only an assumption; the not-exhaustive policy stays.
+- **Design note (my estimate)**: all-pairs conversion of 21 languages is 21 x 20 = 420 directed pairs. Rather than build each, go through a shared IR (21 frontends + 21 backends). Languages differ a lot (Access = DB + UI + VBA in one, COBOL = procedural + reports, Rust = ownership), so what the IR cannot express stays as `TODO`, as in the existing tools.
+- **Meaning of "OS"**: undecided whether it also covers porting to the OS (JCL, UNIX shell, Windows API, Mac) or only the OSes the installed app supports.
