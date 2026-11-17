@@ -27,6 +27,7 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl llm setup [--url http://127.0.0.1:4600] [--model <id>] [--dry-run]
                                               この PC のメモリに合う aruaru-llm のモデルを自動選択して導入(実行したときだけダウンロード)
   pl2pl llm start [--url ...]                  同梱の aruaru-llm を 127.0.0.1 で起動(動いていれば何もしない)
+  pl2pl config [llm <auto|off|モデルID>]        LLM の自動導入を外す(off)/ 既定(auto)/ モデル固定。PL2PL_NO_LLM=1 でも外せる
   pl2pl --version
 ";
 
@@ -49,6 +50,20 @@ fn main() {
     if cmd == "llm" && a.get(2).map(String::as_str) == Some("setup") {
         let url = arg(&a, "--url").unwrap_or_else(|| "http://127.0.0.1:4600".into());
         std::process::exit(llm::setup(&url, a.iter().any(|x| x == "--dry-run"), arg(&a, "--model").as_deref()));
+    }
+    if cmd == "config" {
+        match (a.get(2).map(String::as_str), a.get(3)) {
+            (Some("llm"), Some(v)) => match llm::set_choice(v) {
+                Ok(()) => println!("llm = {v}(保存先 {})", llm::config_path().display()),
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(2);
+                }
+            },
+            _ => println!("llm = {}(設定ファイル {})
+変更: pl2pl config llm <auto|off|モデルID>。環境変数 PL2PL_NO_LLM=1 でも外せます", llm::llm_choice(), llm::config_path().display()),
+        }
+        return;
     }
     if cmd == "llm" && a.get(2).map(String::as_str) == Some("start") {
         let url = arg(&a, "--url").unwrap_or_else(|| "http://127.0.0.1:4600".into());

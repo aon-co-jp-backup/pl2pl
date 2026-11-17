@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # 配布物を作る前に、aruaru-llm の公開リリースを components/bin/ へ取り込む(開発者の作業。利用者の PC では実行しない)。
-# 使い方: bash installer/bundle-components.sh <linux|windows> [版]
+# 使い方: bash installer/bundle-components.sh <linux|windows> [版] [--without-llm]   (--without-llm: 同梱しない版を作る)
 # モデルの重みは含めない(利用者が `pl2pl llm setup` で PC に合うものを自動導入)。
 set -e
+[ "${3:-}" = "--without-llm" ] && { echo "aruaru-llm は取り込みません(--without-llm)"; exit 0; }
 os=${1:?linux か windows}; ver=${2:-$(gh release view --repo aon-co-jp/aruaru-llm --json tagName -q .tagName)}
 mkdir -p components/bin; tmp=$(mktemp -d)
 case "$os" in

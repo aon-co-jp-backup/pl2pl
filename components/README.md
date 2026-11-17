@@ -22,3 +22,7 @@
 - **Models install automatically**: `pl2pl llm setup` checks free memory and picks a fitting model from aruaru-llm's Qwen2.5 catalog (free memory >= about 2.5x the weights, my estimate; smallest plus a warning if short). If the bundled aruaru-llm is not running it starts it on 127.0.0.1:4600, then calls `QwenInstall` and `QwenSelect`. `--dry-run` shows the choice only; `--model <id>` forces one.
 - **Downloads happen only when `llm setup` is run.** The conversion commands download nothing.
 - **Unverified**: a real install against the bundled binary (`QwenInstall`). The selection logic and `--dry-run` are verified; the 2.5x factor is an unmeasured estimate.
+
+## 選択で外す・固定する(2026-11-18、所有者の指示) / Opting out or pinning
+**日本語**: LLM(aruaru-llm と自動導入)は**外せる**。`pl2pl config llm off`(自動導入しない)/ `auto`(既定)/ `<モデルID>`(固定)。環境変数 `PL2PL_NO_LLM=1` でも外せる。外しても変換コマンドは全て動く(変換器は LLM に依存しない)。配布物から同梱自体を外すには `bash installer/bundle-components.sh <os> "" --without-llm`。設定は `PL2PL_CONFIG_DIR`、なければ `%APPDATA%\pl2pl` / `~/.config/pl2pl` の `config.txt`。確認済み: off で何もしない・不正な値を拒否・モデル固定+`--dry-run`・auto に戻す。
+**English**: The LLM (aruaru-llm and automatic install) can be **turned off**: `pl2pl config llm off` / `auto` (default) / `<model id>` (pin), or `PL2PL_NO_LLM=1`. All conversion commands work without it. To leave it out of a distribution use `--without-llm` on the bundle script. Config lives in `config.txt` under `PL2PL_CONFIG_DIR`, `%APPDATA%\pl2pl` or `~/.config/pl2pl`. Verified: off does nothing, bad values are rejected, pinned model with `--dry-run`, back to auto.

@@ -31,6 +31,12 @@ fn post(url: &str, path: &str, body: &str) -> Result<String, String> {
 }
 
 pub fn setup(url: &str, dry: bool, force_id: Option<&str>) -> i32 {
+    let choice = llm_choice();
+    if choice == "off" && force_id.is_none() {
+        println!("LLM の自動導入は「外す」設定です(pl2pl config llm auto で戻せます)。何もしません");
+        return 0;
+    }
+    let force_id = force_id.or(if choice != "auto" && choice != "off" { Some(choice.as_str()) } else { None });
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     let total = sys.total_memory() / 1024 / 1024;
@@ -77,6 +83,16 @@ mod tests {
     fn finds_nothing_when_absent() {
         // テスト環境に aruaru-llm が無ければ None(あれば Some)。どちらでもパニックしない
         let _ = find_binary();
+    }
+    #[test]
+    fn choice_validation() {
+        assert!(set_choice("bogus").is_err());
+    }
+    #[test]
+    fn env_turns_llm_off() {
+        std::env::set_var("PL2PL_NO_LLM", "1");
+        assert_eq!(llm_choice(), "off");
+        std::env::remove_var("PL2PL_NO_LLM");
     }
     #[test]
     fn picks_by_memory() {
@@ -133,4 +149,40 @@ pub fn ensure_running(url: &str) -> Result<(), String> {
         }
     }
     Err("起動後 60 秒待っても応答しません".into())
+}
+
+// ---- 利用者の選択(自動導入を外す / モデルを固定する)----
+
+pub fn config_path() -> std::path::PathBuf {
+    let base = std::env::var_os("PL2PL_CONFIG_DIR")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("APPDATA").map(|a| std::path::PathBuf::from(a).join("pl2pl")))
+        .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(|a| std::path::PathBuf::from(a).join("pl2pl")))
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config").join("pl2pl")))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    base.join("config.txt")
+}
+
+/// "auto"(既定)/ "off"(自動導入しない)/ モデル ID(固定)
+pub fn llm_choice() -> String {
+    if std::env::var("PL2PL_NO_LLM").map(|v| !v.is_empty() && v != "0").unwrap_or(false) {
+        return "off".into();
+    }
+    std::fs::read_to_string(config_path())
+        .ok()
+        .and_then(|t| t.lines().find_map(|l| l.strip_prefix("llm=").map(|v| v.trim().to_string())))
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "auto".into())
+}
+
+pub fn set_choice(v: &str) -> Result<(), String> {
+    let ok = v == "auto" || v == "off" || CANDIDATES.iter().any(|c| c.0 == v);
+    if !ok {
+        return Err(format!("不明な値: {v}(auto / off / {})", CANDIDATES.iter().map(|c| c.0).collect::<Vec<_>>().join(" / ")));
+    }
+    let p = config_path();
+    if let Some(d) = p.parent() {
+        std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&p, format!("llm={v}\n")).map_err(|e| e.to_string())
 }
