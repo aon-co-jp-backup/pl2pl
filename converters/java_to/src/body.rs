@@ -1,0 +1,1453 @@
+//! Java のメソッド本体(文・式)を Python へ移す。範囲は「よく使う構文」に限り、
+//! 移せないものは `raise NotImplementedError("TODO(Java_to): ...")` と元の Java のコメントを残す(黙って捨てない)。
+
+use crate::lexer::Tok;
+use crate::parse::split_top;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Default)]
+pub struct Ctx {
+    pub fields: HashSet<String>,        // 現在のクラスのインスタンスフィールド名
+    pub statics: HashSet<String>,       // 現在のクラスの static フィールド/メソッド名
+    pub methods: HashSet<String>,       // 現在のクラスのメソッド名
+    pub dto: HashSet<String>,           // データクラス名
+    pub svc_methods: HashSet<String>,   // データクラス以外が持つメソッド名(`getX` を属性にしないため)
+    pub locals: HashMap<String, String>, // 変数名 → Java の型
+    pub param_map: HashMap<String, String>, // Java 変数名 → Python 名(変更時)
+    pub query_vars: HashMap<String, String>, // 通信上のクエリ名 → Python 名
+    pub path_vars: HashMap<String, String>,
+    pub body_var: Option<String>,
+    pub servlet: bool,
+    pub lambda_params: Vec<String>,
+    pub notes: Vec<String>,
+    pub uses: HashSet<&'static str>, // `time` `uuid` `math` `re` `rt`
+    pub in_static: bool,
+    pub class_name: String,
+    pub ret_calls: bool,
+}
+
+pub fn snake(n: &str) -> String {
+    let mut out = String::new();
+    let cs: Vec<char> = n.chars().collect();
+    for (i, c) in cs.iter().enumerate() {
+        if c.is_uppercase() {
+            let prev_lower = i > 0 && (cs[i - 1].is_lowercase() || cs[i - 1].is_ascii_digit());
+            let next_lower = i + 1 < cs.len() && cs[i + 1].is_lowercase();
+            if i > 0 && (prev_lower || (next_lower && cs[i - 1].is_uppercase())) {
+                out.push('_');
+            }
+            out.extend(c.to_lowercase());
+        } else {
+            out.push(*c);
+        }
+    }
+    py_ident(&out)
+}
+
+pub fn py_ident(n: &str) -> String {
+    const KW: [&str; 35] = [
+        "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+    ];
+    if KW.contains(&n) {
+        format!("{n}_")
+    } else {
+        n.to_string()
+    }
+}
+
+fn lower_first(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(f) => f.to_lowercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct E {
+    pub s: String,
+    pub ty: String, // "int" "double" "String" "boolean" "" (不明)
+    pub setter: Option<(String, String)>,
+}
+fn e(s: impl Into<String>, ty: &str) -> E {
+    E { s: s.into(), ty: ty.into(), setter: None }
+}
+
+const PRIMS: [&str; 8] = ["int", "long", "short", "byte", "double", "float", "boolean", "char"];
+
+pub fn is_intlike(t: &str) -> bool {
+    matches!(t, "int" | "long" | "short" | "byte" | "Integer" | "Long" | "Short" | "Byte")
+}
+pub fn is_floatlike(t: &str) -> bool {
+    matches!(t, "double" | "float" | "Double" | "Float" | "BigDecimal")
+}
+
+pub struct Tr<'a> {
+    pub t: &'a [Tok],
+    pub i: usize,
+    pub c: &'a mut Ctx,
+}
+
+impl<'a> Tr<'a> {
+    pub fn new(t: &'a [Tok], c: &'a mut Ctx) -> Self {
+        Tr { t, i: 0, c }
+    }
+    fn peek(&self) -> Option<&Tok> {
+        self.t.get(self.i)
+    }
+    fn peek_n(&self, n: usize) -> Option<&Tok> {
+        self.t.get(self.i + n)
+    }
+    fn at(&self, p: &str) -> bool {
+        self.peek().is_some_and(|t| t.is(p))
+    }
+    fn at_id(&self, p: &str) -> bool {
+        self.peek().is_some_and(|t| t.id(p))
+    }
+    fn eat(&mut self, p: &str) -> bool {
+        if self.at(p) {
+            self.i += 1;
+            true
+        } else {
+            false
+        }
+    }
+    fn done(&self) -> bool {
+        self.i >= self.t.len()
+    }
+    fn balanced(&mut self, open: &str, close: &str) -> Vec<Tok> {
+        let mut d = 0;
+        let mut out = vec![];
+        while let Some(t) = self.peek().cloned() {
+            self.i += 1;
+            if t.is(open) {
+                d += 1;
+                if d == 1 {
+                    continue;
+                }
+            } else if t.is(close) {
+                d -= 1;
+                if d == 0 {
+                    break;
+                }
+            }
+            out.push(t);
+        }
+        out
+    }
+
+    // ---------------- 文 ----------------
+
+    pub fn stmts(&mut self, ind: usize, out: &mut Vec<String>) {
+        while !self.done() {
+            self.stmt(ind, out);
+        }
+    }
+
+    fn pad(ind: usize) -> String {
+        "    ".repeat(ind)
+    }
+
+    fn todo(&mut self, ind: usize, out: &mut Vec<String>, what: &str, toks: &[Tok]) {
+        let src: String = toks.iter().map(|t| t.text()).collect::<Vec<_>>().join(" ");
+        let src: String = src.chars().take(160).collect();
+        self.c.notes.push(format!("{what}: {src}"));
+        out.push(format!("{}# Java: {}", Self::pad(ind), src.replace('\n', " ")));
+        out.push(format!("{}raise NotImplementedError(\"TODO(Java_to): {}\")", Self::pad(ind), what));
+    }
+
+    fn skip_stmt(&mut self) -> Vec<Tok> {
+        let st = self.i;
+        let mut d = 0i32;
+        while let Some(t) = self.peek() {
+            if t.is("(") || t.is("{") || t.is("[") {
+                d += 1;
+            } else if t.is(")") || t.is("}") || t.is("]") {
+                d -= 1;
+            } else if t.is(";") && d <= 0 {
+                self.i += 1;
+                break;
+            }
+            self.i += 1;
+            if d == 0 && self.t.get(self.i - 1).is_some_and(|x| x.is("}")) && !self.at("else") && !self.at("catch") && !self.at("finally") && !self.at_id("while") {
+                break;
+            }
+        }
+        self.t[st..self.i].to_vec()
+    }
+
+    fn body(&mut self, ind: usize, out: &mut Vec<String>) {
+        let before = out.len();
+        if self.at("{") {
+            let inner = self.balanced("{", "}");
+            let mut sub = Tr { t: &inner, i: 0, c: &mut *self.c };
+            sub.stmts(ind, out);
+        } else {
+            self.stmt(ind, out);
+        }
+        if out.len() == before {
+            out.push(format!("{}pass", Self::pad(ind)));
+        }
+    }
+
+    fn stmt(&mut self, ind: usize, out: &mut Vec<String>) {
+        let p = Self::pad(ind);
+        let Some(tok) = self.peek().cloned() else { return };
+        match &tok {
+            Tok::P(s) if s == ";" => {
+                self.i += 1;
+            }
+            Tok::P(s) if s == "{" => {
+                let inner = self.balanced("{", "}");
+                let mut sub = Tr { t: &inner, i: 0, c: &mut *self.c };
+                sub.stmts(ind, out);
+            }
+            Tok::Id(k) if k == "if" => {
+                self.i += 1;
+                let cond = self.balanced("(", ")");
+                let cs = self.sub_expr(&cond).s;
+                out.push(format!("{p}if {cs}:"));
+                self.body(ind + 1, out);
+                while self.at_id("else") {
+                    self.i += 1;
+                    if self.at_id("if") {
+                        self.i += 1;
+                        let cond = self.balanced("(", ")");
+                        let cs = self.sub_expr(&cond).s;
+                        out.push(format!("{p}elif {cs}:"));
+                        self.body(ind + 1, out);
+                    } else {
+                        out.push(format!("{p}else:"));
+                        self.body(ind + 1, out);
+                        break;
+                    }
+                }
+            }
+            Tok::Id(k) if k == "while" => {
+                self.i += 1;
+                let cond = self.balanced("(", ")");
+                let cs = self.sub_expr(&cond).s;
+                out.push(format!("{p}while {cs}:"));
+                self.body(ind + 1, out);
+            }
+            Tok::Id(k) if k == "do" => {
+                self.i += 1;
+                out.push(format!("{p}while True:"));
+                self.body(ind + 1, out);
+                if self.at_id("while") {
+                    self.i += 1;
+                    let cond = self.balanced("(", ")");
+                    let cs = self.sub_expr(&cond).s;
+                    out.push(format!("{}if not ({cs}):", Self::pad(ind + 1)));
+                    out.push(format!("{}break", Self::pad(ind + 2)));
+                    self.eat(";");
+                }
+            }
+            Tok::Id(k) if k == "for" => self.for_stmt(ind, out),
+            Tok::Id(k) if k == "return" => {
+                self.i += 1;
+                if self.eat(";") {
+                    out.push(format!("{p}return"));
+                } else {
+                    let st = self.i;
+                    let ex = self.expr(0);
+                    self.eat(";");
+                    let _ = st;
+                    out.push(format!("{p}return {}", ex.s));
+                }
+            }
+            Tok::Id(k) if k == "throw" => {
+                self.i += 1;
+                let ex = self.throw_expr();
+                self.eat(";");
+                out.push(format!("{p}raise {ex}"));
+            }
+            Tok::Id(k) if k == "break" || k == "continue" => {
+                self.i += 1;
+                if matches!(self.peek(), Some(Tok::Id(_))) {
+                    self.i += 1; // ラベルは無視
+                    self.c.notes.push("ラベル付き break/continue".into());
+                }
+                self.eat(";");
+                out.push(format!("{p}{k}"));
+            }
+            Tok::Id(k) if k == "try" => self.try_stmt(ind, out),
+            Tok::Id(k) if k == "synchronized" => {
+                self.i += 1;
+                let _ = self.balanced("(", ")");
+                self.body(ind, out);
+            }
+            Tok::Id(k) if k == "switch" => {
+                let toks = self.skip_stmt();
+                self.todo(ind, out, "switch 文", &toks);
+            }
+            Tok::Id(k) if k == "assert" => {
+                let _ = self.skip_stmt();
+            }
+            _ => {
+                if self.looks_like_decl() {
+                    self.decl(ind, out);
+                } else {
+                    let st = self.i;
+                    let line = self.expr_stmt();
+                    match line {
+                        Some(l) => out.push(format!("{p}{l}")),
+                        None => {
+                            self.i = st;
+                            let toks = self.skip_stmt();
+                            self.todo(ind, out, "未対応の式", &toks);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn throw_expr(&mut self) -> String {
+        // `new X("msg")` を HTTP エラーなどへ
+        if self.at_id("new") {
+            let save = self.i;
+            self.i += 1;
+            let name = self.qname();
+            if self.at("(") {
+                let args_t = self.balanced("(", ")");
+                let args: Vec<E> = split_top(&args_t, ",").iter().filter(|x| !x.is_empty()).map(|a| self.sub_expr(a)).collect();
+                let msg = args.last().map(|a| a.s.clone()).unwrap_or_else(|| "\"\"".into());
+                let short = name.rsplit('.').next().unwrap_or("");
+                let code = match short {
+                    "NotFoundException" | "NoSuchElementException" | "EntityNotFoundException" | "ResourceNotFoundException" => Some(404),
+                    "BadRequestException" | "IllegalArgumentException" | "ValidationException" => Some(400),
+                    "ForbiddenException" | "AccessDeniedException" => Some(403),
+                    "NotAuthorizedException" | "UnauthorizedException" | "AuthenticationException" => Some(401),
+                    "ConflictException" => Some(409),
+                    "IllegalStateException" => Some(409),
+                    _ => None,
+                };
+                self.c.uses.insert("http");
+                if short == "ResponseStatusException" {
+                    // new ResponseStatusException(HttpStatus.NOT_FOUND, "msg")
+                    let st = args.first().map(|a| status_from(&a.s)).unwrap_or(500);
+                    let m = args.get(1).map(|a| a.s.clone()).unwrap_or_else(|| "\"\"".into());
+                    return format!("HTTPException(status_code={st}, detail={m})");
+                }
+                if let Some(c) = code {
+                    return format!("HTTPException(status_code={c}, detail={msg})");
+                }
+                return format!("Exception({})", if args.is_empty() { String::new() } else { msg });
+            }
+            self.i = save;
+        }
+        self.expr(0).s
+    }
+
+    fn qname(&mut self) -> String {
+        let mut s = String::new();
+        if let Some(Tok::Id(x)) = self.peek().cloned() {
+            self.i += 1;
+            s = x;
+        }
+        while self.at(".") && matches!(self.peek_n(1), Some(Tok::Id(_))) {
+            self.i += 1;
+            if let Some(Tok::Id(x)) = self.peek().cloned() {
+                self.i += 1;
+                s.push('.');
+                s.push_str(&x);
+            }
+        }
+        s
+    }
+
+    fn skip_generics(&mut self) {
+        let mut d = 0i32;
+        while let Some(t) = self.peek().cloned() {
+            self.i += 1;
+            match &t {
+                Tok::P(p) if p == "<" => d += 1,
+                Tok::P(p) if p == ">" => d -= 1,
+                Tok::P(p) if p == ">>" => d -= 2,
+                Tok::P(p) if p == ">>>" => d -= 3,
+                _ => {}
+            }
+            if d <= 0 {
+                break;
+            }
+        }
+    }
+
+    /// `Type name =` / `Type name;` / `final var x =` の判定(先読みのみ、位置は戻す)。
+    fn looks_like_decl(&mut self) -> bool {
+        let save = self.i;
+        let ok = (|| {
+            while self.at_id("final") {
+                self.i += 1;
+            }
+            let Some(Tok::Id(first)) = self.peek().cloned() else { return false };
+            if ["new", "this", "super", "return", "else", "case", "default"].contains(&first.as_str()) {
+                return false;
+            }
+            self.qname();
+            if self.at("<") {
+                self.skip_generics();
+            }
+            while self.at("[") && self.peek_n(1).is_some_and(|t| t.is("]")) {
+                self.i += 2;
+            }
+            matches!(self.peek(), Some(Tok::Id(_))) && self.peek_n(1).is_some_and(|t| t.is("=") || t.is(";") || t.is(",") || t.is(":"))
+        })();
+        self.i = save;
+        ok
+    }
+
+    fn decl(&mut self, ind: usize, out: &mut Vec<String>) {
+        let p = Self::pad(ind);
+        while self.at_id("final") {
+            self.i += 1;
+        }
+        let mut ty = self.qname();
+        if self.at("<") {
+            let st = self.i;
+            self.skip_generics();
+            let g: String = self.t[st..self.i].iter().map(|t| t.text()).collect();
+            ty.push_str(&g);
+        }
+        while self.at("[") {
+            self.i += 2;
+            ty.push_str("[]");
+        }
+        loop {
+            let Some(Tok::Id(name)) = self.peek().cloned() else { break };
+            self.i += 1;
+            while self.at("[") {
+                self.i += 2;
+            }
+            let py = py_ident(&snake(&name));
+            if self.eat("=") {
+                let ex = if self.at("{") {
+                    let inner = self.balanced("{", "}");
+                    let items: Vec<String> = split_top(&inner, ",").iter().filter(|x| !x.is_empty()).map(|a| self.sub_expr(a).s).collect();
+                    e(format!("[{}]", items.join(", ")), "")
+                } else {
+                    self.expr(0)
+                };
+                let real_ty = if ty == "var" { ex.ty.clone() } else { ty.clone() };
+                self.c.locals.insert(name.clone(), real_ty);
+                self.c.param_map.insert(name.clone(), py.clone());
+                out.push(format!("{p}{py} = {}", ex.s));
+            } else {
+                self.c.locals.insert(name.clone(), ty.clone());
+                self.c.param_map.insert(name.clone(), py.clone());
+                out.push(format!("{p}{py} = {}", default_value(&ty)));
+            }
+            if !self.eat(",") {
+                break;
+            }
+        }
+        self.eat(";");
+    }
+
+    fn for_stmt(&mut self, ind: usize, out: &mut Vec<String>) {
+        let p = Self::pad(ind);
+        self.i += 1;
+        let head = self.balanced("(", ")");
+        let semis = split_top(&head, ";");
+        if semis.len() == 3 {
+            let (init, cond, upd) = (&semis[0], &semis[1], &semis[2]);
+            // 典型形: int i = A; i < B; i++
+            if let Some(range) = classic_range(init, cond, upd, self) {
+                let (var, a, b, step) = range;
+                self.c.locals.insert(var.clone(), "int".into());
+                let py = snake(&var);
+                self.c.param_map.insert(var.clone(), py.clone());
+                let rng = if step == 1 && a == "0" { format!("range({b})") } else if step == 1 { format!("range({a}, {b})") } else { format!("range({a}, {b}, {step})") };
+                out.push(format!("{p}for {py} in {rng}:"));
+                self.body(ind + 1, out);
+                return;
+            }
+            // 一般形: init; while cond: body; update
+            if !init.is_empty() {
+                let mut sub = Tr { t: init, i: 0, c: &mut *self.c };
+                sub.stmts(ind, out);
+            }
+            let cs = if cond.is_empty() { "True".to_string() } else { self.sub_expr(cond).s };
+            out.push(format!("{p}while {cs}:"));
+            let mut inner = vec![];
+            self.body(ind + 1, &mut inner);
+            if inner.iter().any(|l| l.trim() == "continue") {
+                self.c.notes.push("for 文の continue は更新式を飛ばす(要確認)".into());
+            }
+            if inner.len() == 1 && inner[0].trim() == "pass" {
+                inner.clear();
+            }
+            out.extend(inner);
+            for u in split_top(upd, ",") {
+                if u.is_empty() {
+                    continue;
+                }
+                let mut sub = Tr { t: &u, i: 0, c: &mut *self.c };
+                if let Some(l) = sub.expr_stmt() {
+                    out.push(format!("{}{l}", Self::pad(ind + 1)));
+                }
+            }
+            return;
+        }
+        // for-each: `Type x : expr`
+        let colon = head.iter().position(|t| t.is(":"));
+        if let Some(ci) = colon {
+            let lhs = &head[..ci];
+            let name = lhs.iter().rev().find_map(|t| if let Tok::Id(s) = t { Some(s.clone()) } else { None }).unwrap_or_else(|| "item".into());
+            let ty: String = lhs[..lhs.len().saturating_sub(1)].iter().filter(|t| !t.id("final")).map(|t| t.text()).collect();
+            let it = self.sub_expr(&head[ci + 1..]);
+            let py = snake(&name);
+            self.c.locals.insert(name.clone(), ty);
+            self.c.param_map.insert(name, py.clone());
+            out.push(format!("{p}for {py} in {}:", it.s));
+            self.body(ind + 1, out);
+            return;
+        }
+        self.todo(ind, out, "for 文", &head);
+        let _ = self.skip_stmt();
+    }
+
+    fn try_stmt(&mut self, ind: usize, out: &mut Vec<String>) {
+        let p = Self::pad(ind);
+        self.i += 1;
+        if self.at("(") {
+            // try-with-resources: 資源を普通の代入として先に出す(close は呼ばない)
+            let res = self.balanced("(", ")");
+            for part in split_top(&res, ";") {
+                if part.is_empty() {
+                    continue;
+                }
+                let mut sub = Tr { t: &part, i: 0, c: &mut *self.c };
+                sub.stmts(ind, out);
+            }
+            self.c.notes.push("try-with-resources の close() は呼ばない".into());
+        }
+        out.push(format!("{p}try:"));
+        self.body(ind + 1, out);
+        let mut had = false;
+        while self.at_id("catch") {
+            self.i += 1;
+            let head = self.balanced("(", ")");
+            let name = head.iter().rev().find_map(|t| if let Tok::Id(s) = t { Some(s.clone()) } else { None }).unwrap_or_else(|| "e".into());
+            let types: Vec<String> = head
+                .iter()
+                .filter_map(|t| if let Tok::Id(s) = t { Some(s.clone()) } else { None })
+                .filter(|s| s != "final" && *s != name && s.chars().next().is_some_and(|c| c.is_uppercase()))
+                .collect();
+            let pyty: Vec<String> = types.iter().map(|t| exc_map(t)).collect();
+            let list = if pyty.len() == 1 { pyty[0].clone() } else { format!("({})", pyty.join(", ")) };
+            self.c.locals.insert(name.clone(), "Exception".into());
+            out.push(format!("{p}except {list} as {}:", snake(&name)));
+            self.c.param_map.insert(name, "".into());
+            self.body(ind + 1, out);
+            had = true;
+        }
+        if self.at_id("finally") {
+            self.i += 1;
+            out.push(format!("{p}finally:"));
+            self.body(ind + 1, out);
+            had = true;
+        }
+        if !had {
+            out.push(format!("{p}finally:"));
+            out.push(format!("{}pass", Self::pad(ind + 1)));
+        }
+    }
+
+    /// 式文: 代入・複合代入・++/--・メソッド呼び出し。変換できなければ None。
+    fn expr_stmt(&mut self) -> Option<String> {
+        let st = self.i;
+        let lhs = self.expr(13);
+        // 代入
+        if let Some(Tok::P(op)) = self.peek().cloned() {
+            if ["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="].contains(&op.as_str()) {
+                self.i += 1;
+                let rhs = self.expr(0);
+                self.eat(";");
+                let pyop = match op.as_str() {
+                    "/=" if is_intlike(&lhs.ty) => "//=".to_string(),
+                    o => o.to_string(),
+                };
+                if op == "+=" && lhs.ty == "String" {
+                    return Some(format!("{} += {}", lhs.s, str_wrap(&rhs)));
+                }
+                return Some(format!("{} {pyop} {}", lhs.s, rhs.s));
+            }
+            if op == "++" || op == "--" {
+                self.i += 1;
+                self.eat(";");
+                return Some(format!("{} {}= 1", lhs.s, if op == "++" { "+" } else { "-" }));
+            }
+        }
+        if self.at(";") || self.done() {
+            self.eat(";");
+            if let Some((r, v)) = lhs.setter {
+                return Some(format!("{r} = {v}"));
+            }
+            if lhs.s.is_empty() {
+                return None;
+            }
+            if let Some(rest) = lhs.s.strip_prefix('\u{1}') {
+                return Some(format!("return {rest}"));
+            }
+            return Some(lhs.s);
+        }
+        self.i = st;
+        None
+    }
+
+    // ---------------- 式 ----------------
+
+    pub fn sub_expr(&mut self, toks: &[Tok]) -> E {
+        let mut sub = Tr { t: toks, i: 0, c: &mut *self.c };
+        sub.expr(0)
+    }
+
+    fn binop(op: &str) -> Option<(u8, &'static str)> {
+        Some(match op {
+            "||" => (3, "or"),
+            "&&" => (4, "and"),
+            "|" => (5, "|"),
+            "^" => (6, "^"),
+            "&" => (7, "&"),
+            "==" => (8, "=="),
+            "!=" => (8, "!="),
+            "<" => (9, "<"),
+            ">" => (9, ">"),
+            "<=" => (9, "<="),
+            ">=" => (9, ">="),
+            "<<" => (10, "<<"),
+            ">>" => (10, ">>"),
+            ">>>" => (10, ">>"),
+            "+" => (11, "+"),
+            "-" => (11, "-"),
+            "*" => (12, "*"),
+            "/" => (12, "/"),
+            "%" => (12, "%"),
+            _ => return None,
+        })
+    }
+
+    pub fn expr(&mut self, min: u8) -> E {
+        let mut left = self.unary();
+        loop {
+            // 三項演算子(優先度 2)
+            if min <= 2 && self.at("?") {
+                self.i += 1;
+                let a = self.expr(2);
+                self.eat(":");
+                let b = self.expr(2);
+                left = e(format!("({} if {} else {})", a.s, left.s, b.s), &a.ty);
+                continue;
+            }
+            // instanceof
+            if min <= 9 && self.at_id("instanceof") {
+                self.i += 1;
+                let ty = self.qname();
+                if self.at("<") {
+                    self.skip_generics();
+                }
+                // パターン変数 `instanceof Foo f`
+                if matches!(self.peek(), Some(Tok::Id(_))) && !self.at_id("instanceof") {
+                    self.i += 1;
+                }
+                left = e(format!("isinstance({}, {})", left.s, inst_map(&ty)), "boolean");
+                continue;
+            }
+            let Some(Tok::P(op)) = self.peek().cloned() else { break };
+            let Some((prec, py)) = Self::binop(&op) else { break };
+            if prec < min {
+                break;
+            }
+            self.i += 1;
+            let right = self.expr(prec + 1);
+            left = self.combine(left, py, right);
+        }
+        left
+    }
+
+    fn combine(&mut self, l: E, op: &str, r: E) -> E {
+        match op {
+            "+" => {
+                if l.ty == "String" || r.ty == "String" || l.s.starts_with('"') || r.s.starts_with('"') {
+                    return e(format!("{} + {}", str_wrap(&l), str_wrap(&r)), "String");
+                }
+                let ty = if is_floatlike(&l.ty) || is_floatlike(&r.ty) { "double" } else if is_intlike(&l.ty) && is_intlike(&r.ty) { "int" } else { "" };
+                e(format!("{} + {}", l.s, r.s), ty)
+            }
+            "/" => {
+                if is_intlike(&l.ty) && is_intlike(&r.ty) {
+                    e(format!("{} // {}", l.s, r.s), "int")
+                } else if is_floatlike(&l.ty) || is_floatlike(&r.ty) {
+                    e(format!("{} / {}", l.s, r.s), "double")
+                } else {
+                    // 型が分からない: 整数同士なら切り捨てだが、確証が無いので `/` のままにして注記
+                    self.c.notes.push("型不明の除算: Java の整数除算なら // へ変更".into());
+                    e(format!("{} / {}", l.s, r.s), "")
+                }
+            }
+            "==" | "!=" => {
+                // 参照比較の null は is / is not
+                if r.s == "None" || l.s == "None" {
+                    let w = if op == "==" { "is" } else { "is not" };
+                    return e(format!("{} {w} {}", l.s, r.s), "boolean");
+                }
+                e(format!("{} {op} {}", l.s, r.s), "boolean")
+            }
+            "and" | "or" => e(format!("{} {op} {}", paren_if_or(&l.s, op), paren_if_or(&r.s, op)), "boolean"),
+            "<" | ">" | "<=" | ">=" => e(format!("{} {op} {}", l.s, r.s), "boolean"),
+            _ => {
+                let ty = if is_floatlike(&l.ty) || is_floatlike(&r.ty) { "double" } else if is_intlike(&l.ty) && is_intlike(&r.ty) { "int" } else { "" };
+                e(format!("{} {op} {}", l.s, r.s), ty)
+            }
+        }
+    }
+
+    fn unary(&mut self) -> E {
+        let Some(t) = self.peek().cloned() else { return e("", "") };
+        match &t {
+            Tok::P(p) if p == "!" => {
+                self.i += 1;
+                let x = self.unary();
+                e(format!("not {}", wrap_cmp(&x.s)), "boolean")
+            }
+            Tok::P(p) if p == "-" => {
+                self.i += 1;
+                let x = self.unary();
+                e(format!("-{}", x.s), &x.ty)
+            }
+            Tok::P(p) if p == "+" => {
+                self.i += 1;
+                self.unary()
+            }
+            Tok::P(p) if p == "~" => {
+                self.i += 1;
+                let x = self.unary();
+                e(format!("~{}", x.s), &x.ty)
+            }
+            Tok::P(p) if p == "++" || p == "--" => {
+                self.i += 1;
+                let x = self.unary();
+                self.c.notes.push("式の中の前置 ++/--".into());
+                x
+            }
+            Tok::P(p) if p == "(" => {
+                // キャスト?
+                if let (Some(Tok::Id(ty)), Some(close)) = (self.peek_n(1).cloned(), self.peek_n(2)) {
+                    if close.is(")") {
+                        let next = self.peek_n(3).cloned();
+                        let starts = matches!(next, Some(Tok::Id(_)) | Some(Tok::Num(_)) | Some(Tok::Str(_)) | Some(Tok::Chr(_))) || next.as_ref().is_some_and(|n| n.is("(") || n.is("!"));
+                        let prim = PRIMS.contains(&ty.as_str());
+                        let upper = ty.chars().next().is_some_and(|c| c.is_uppercase());
+                        if starts && (prim || upper) {
+                            self.i += 3;
+                            let x = self.unary();
+                            return match ty.as_str() {
+                                "int" | "long" | "short" | "byte" => e(format!("int({})", x.s), "int"),
+                                "double" | "float" => e(format!("float({})", x.s), "double"),
+                                "char" => e(format!("chr({})", x.s), "String"),
+                                "String" => e(format!("str({})", x.s), "String"),
+                                _ => x,
+                            };
+                        }
+                    }
+                }
+                let inner = self.balanced("(", ")");
+                let x = self.sub_expr(&inner);
+                let r = e(format!("({})", x.s), &x.ty);
+                self.postfix(r)
+            }
+            _ => {
+                let p = self.primary();
+                self.postfix(p)
+            }
+        }
+    }
+
+    fn args(&mut self) -> Vec<E> {
+        let toks = self.balanced("(", ")");
+        split_top(&toks, ",").iter().filter(|x| !x.is_empty()).map(|a| self.sub_expr(a)).collect()
+    }
+
+    fn primary(&mut self) -> E {
+        let Some(t) = self.peek().cloned() else { return e("", "") };
+        self.i += 1;
+        match t {
+            Tok::Num(n) => {
+                let ty = if n.contains('.') || n.to_lowercase().ends_with('d') && !n.starts_with("0x") || n.to_lowercase().ends_with('f') && !n.starts_with("0x") { "double" } else { "int" };
+                let clean = n.trim_end_matches(['L', 'l', 'f', 'F', 'd', 'D']).to_string();
+                e(clean, ty)
+            }
+            Tok::Str(s) => e(py_str(&s), "String"),
+            Tok::Chr(s) => e(py_str(&s.replace("\\'", "'")), "String"),
+            Tok::P(p) if p == "{" => {
+                self.i -= 1;
+                let inner = self.balanced("{", "}");
+                let items: Vec<String> = split_top(&inner, ",").iter().filter(|x| !x.is_empty()).map(|a| self.sub_expr(a).s).collect();
+                e(format!("[{}]", items.join(", ")), "")
+            }
+            Tok::Id(id) => match id.as_str() {
+                "true" => e("True", "boolean"),
+                "false" => e("False", "boolean"),
+                "null" => e("None", ""),
+                "this" => e("self", ""),
+                "super" => e("super()", ""),
+                "new" => self.new_expr(),
+                _ => self.name_or_call(id),
+            },
+            Tok::P(p) => e(p, ""),
+        }
+    }
+
+    fn new_expr(&mut self) -> E {
+        let name = self.qname();
+        let short = name.rsplit('.').next().unwrap_or("").to_string();
+        if self.at("<") {
+            self.skip_generics();
+        }
+        if self.at("[") {
+            // 配列
+            let mut dims = vec![];
+            while self.at("[") {
+                let inner = self.balanced("[", "]");
+                dims.push(inner);
+            }
+            if self.at("{") {
+                let inner = self.balanced("{", "}");
+                let items: Vec<String> = split_top(&inner, ",").iter().filter(|x| !x.is_empty()).map(|a| self.sub_expr(a).s).collect();
+                return e(format!("[{}]", items.join(", ")), "");
+            }
+            let n = dims.first().filter(|d| !d.is_empty()).map(|d| self.sub_expr(d).s).unwrap_or_else(|| "0".into());
+            return e(format!("[{}] * ({})", default_value(&short), n), "");
+        }
+        let args = if self.at("(") { self.args() } else { vec![] };
+        if self.at("{") {
+            let _ = self.balanced("{", "}"); // 匿名クラス
+            self.c.notes.push(format!("匿名クラス new {short}(...) {{...}} は未対応"));
+            return e("None", "");
+        }
+        let a: Vec<String> = args.iter().map(|x| x.s.clone()).collect();
+        let r = match short.as_str() {
+            "ArrayList" | "LinkedList" | "Vector" | "ArrayDeque" | "CopyOnWriteArrayList" | "Stack" => {
+                if a.is_empty() || args[0].ty == "int" { "[]".to_string() } else { format!("list({})", a[0]) }
+            }
+            "HashMap" | "LinkedHashMap" | "TreeMap" | "ConcurrentHashMap" | "Hashtable" | "EnumMap" => {
+                if a.is_empty() || args[0].ty == "int" { "{}".to_string() } else { format!("dict({})", a[0]) }
+            }
+            "HashSet" | "LinkedHashSet" | "TreeSet" | "CopyOnWriteArraySet" => {
+                if a.is_empty() || args[0].ty == "int" { "set()".to_string() } else { format!("set({})", a[0]) }
+            }
+            "String" => {
+                if a.is_empty() { "\"\"".to_string() } else { format!("str({})", a[0]) }
+            }
+            "StringBuilder" | "StringBuffer" => {
+                self.c.uses.insert("rt");
+                format!("StringBuilder({})", if a.is_empty() || args[0].ty == "int" { String::new() } else { a[0].clone() })
+            }
+            "Object" => "object()".to_string(),
+            "AtomicInteger" | "AtomicLong" => {
+                self.c.uses.insert("rt");
+                format!("AtomicNumber({})", a.first().cloned().unwrap_or_else(|| "0".into()))
+            }
+            "Random" => {
+                self.c.uses.insert("random");
+                "random.Random()".to_string()
+            }
+            "Date" => {
+                self.c.uses.insert("datetime");
+                "datetime.datetime.now()".to_string()
+            }
+            "Integer" | "Long" | "Short" | "Byte" => format!("int({})", a.first().cloned().unwrap_or_default()),
+            "Double" | "Float" | "BigDecimal" => format!("float({})", a.first().cloned().unwrap_or_default()),
+            "Boolean" => format!("bool({})", a.first().cloned().unwrap_or_default()),
+            "RuntimeException" | "Exception" | "IllegalArgumentException" | "IllegalStateException" | "UnsupportedOperationException" => format!("{}({})", exc_map(&short), a.first().cloned().unwrap_or_default()),
+            _ => format!("{}({})", short, a.join(", ")),
+        };
+        let ty = match short.as_str() {
+            "String" | "StringBuilder" | "StringBuffer" => "String",
+            "ArrayList" | "LinkedList" => "List",
+            "HashMap" | "LinkedHashMap" | "TreeMap" | "ConcurrentHashMap" => "Map",
+            "HashSet" | "LinkedHashSet" | "TreeSet" => "Set",
+            _ => "",
+        };
+        e(r, ty)
+    }
+
+    fn name_or_call(&mut self, id: String) -> E {
+        // 型付きの静的呼び出しや単純な名前
+        if self.at("(") {
+            let args = self.args();
+            return self.unqualified_call(&id, args);
+        }
+        if self.at("->") {
+            // 引数1つのラムダ
+            self.i += 1;
+            return self.lambda(vec![id]);
+        }
+        if self.at("::") {
+            self.i += 1;
+            let m = if let Some(Tok::Id(x)) = self.peek().cloned() {
+                self.i += 1;
+                x
+            } else {
+                String::new()
+            };
+            self.c.notes.push(format!("メソッド参照 {id}::{m} は未対応"));
+            return e(format!("{}.{}", id, snake(&m)), "");
+        }
+        self.var(&id)
+    }
+
+    fn var(&mut self, id: &str) -> E {
+        if let Some(py) = self.c.param_map.get(id) {
+            if !py.is_empty() {
+                let ty = self.c.locals.get(id).cloned().unwrap_or_default();
+                return e(py.clone(), &norm_ty(&ty));
+            }
+        }
+        if self.c.lambda_params.iter().any(|x| x == id) {
+            return e(snake(id), "");
+        }
+        if self.c.fields.contains(id) {
+            let ty = self.c.locals.get(&format!("this.{id}")).cloned().unwrap_or_default();
+            return e(format!("self.{}", snake(id)), &norm_ty(&ty));
+        }
+        if self.c.statics.contains(id) {
+            return e(format!("{}.{}", self.c.class_name, id), "");
+        }
+        if id.chars().next().is_some_and(|c| c.is_uppercase()) {
+            // 型名(静的メンバーの前)や定数
+            return e(id.to_string(), "");
+        }
+        e(snake(id), &norm_ty(&self.c.locals.get(id).cloned().unwrap_or_default()))
+    }
+
+    fn lambda(&mut self, params: Vec<String>) -> E {
+        // 式のラムダだけ変換、ブロックは未対応(注記して None)
+        for p in &params {
+            self.c.lambda_params.push(p.clone());
+        }
+        let r = if self.at("{") {
+            let inner = self.balanced("{", "}");
+            // 単一の `return expr;` なら式に
+            if inner.first().is_some_and(|t| t.id("return")) && inner.iter().filter(|t| t.is(";")).count() == 1 {
+                e(format!("lambda {}: {}", params.iter().map(|x| snake(x)).collect::<Vec<_>>().join(", "), self.sub_expr(&inner[1..inner.len() - 1]).s), "")
+            } else {
+                self.c.notes.push("ブロック本体のラムダは未対応".into());
+                e("None", "")
+            }
+        } else {
+            let b = self.expr(2);
+            e(format!("lambda {}: {}", params.iter().map(|x| snake(x)).collect::<Vec<_>>().join(", "), b.s), "")
+        };
+        for _ in &params {
+            self.c.lambda_params.pop();
+        }
+        r
+    }
+
+    fn unqualified_call(&mut self, name: &str, args: Vec<E>) -> E {
+        let a: Vec<String> = args.iter().map(|x| x.s.clone()).collect();
+        if name == "this" {
+            return e(format!("self.__init__({})", a.join(", ")), "");
+        }
+        if name == "super" {
+            return e(format!("super().__init__({})", a.join(", ")), "");
+        }
+        if self.c.methods.contains(name) {
+            let recv = if self.c.in_static { "cls" } else { "self" };
+            return e(format!("{recv}.{}({})", snake(name), a.join(", ")), "");
+        }
+        e(format!("{}({})", snake(name), a.join(", ")), "")
+    }
+
+    fn postfix(&mut self, mut x: E) -> E {
+        loop {
+            if self.at(".") || self.at("?.") {
+                self.i += 1;
+                let Some(Tok::Id(name)) = self.peek().cloned() else { break };
+                self.i += 1;
+                if self.at("<") {
+                    // 明示的な型引数 `.<T>foo()` は読み飛ばし
+                }
+                if self.at("(") {
+                    let args = self.args();
+                    x = self.method_call(x, &name, args);
+                } else if name == "length" && x.ty.ends_with("[]") {
+                    x = e(format!("len({})", x.s), "int");
+                } else if name == "length" {
+                    x = e(format!("len({})", x.s), "int");
+                } else {
+                    // フィールド参照: 型名.CONSTANT や obj.field
+                    let n = if x.s.chars().next().is_some_and(|c| c.is_uppercase()) && x.s.chars().all(|c| c.is_alphanumeric() || c == '_') { name.clone() } else { name.clone() };
+                    x = e(format!("{}.{}", x.s, if n.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) { n } else { n }), "");
+                }
+            } else if self.at("[") {
+                let inner = self.balanced("[", "]");
+                let idx = self.sub_expr(&inner);
+                x = e(format!("{}[{}]", x.s, idx.s), "");
+            } else if self.at("++") || self.at("--") {
+                break; // 文側で扱う
+            } else if self.at("->") {
+                break;
+            } else {
+                break;
+            }
+        }
+        x
+    }
+
+    fn method_call(&mut self, recv: E, name: &str, args: Vec<E>) -> E {
+        let r = recv.s.clone();
+        let a: Vec<String> = args.iter().map(|x| x.s.clone()).collect();
+        let n = args.len();
+        let is_type = r.chars().next().is_some_and(|c| c.is_uppercase()) && !r.contains('(') && !r.contains('.');
+        // ---- 静的メソッド ----
+        if is_type || r.starts_with("System.") {
+            if let Some(x) = self.static_call(&r, name, &args) {
+                return x;
+            }
+        }
+        if r == "System.out" || r == "System.err" {
+            return e(format!("print({})", a.join(", ")), "");
+        }
+        // ---- サーブレット / Spark / Javalin の入出力 ----
+        if let Some(x) = self.web_call(&r, name, &args) {
+            return x;
+        }
+        // ---- 文字列・コレクション ----
+        let ty = recv.ty.as_str();
+        let is_map = ty.starts_with("Map") || ty.contains("HashMap") || ty.contains("TreeMap");
+        let is_set = ty.starts_with("Set") || ty.contains("HashSet") || ty.contains("TreeSet");
+        let out = match (name, n) {
+            ("equals", 1) => e(format!("({r} == {})", a[0]), "boolean"),
+            ("equalsIgnoreCase", 1) => e(format!("({r}.lower() == {}.lower())", a[0]), "boolean"),
+            ("length", 0) | ("size", 0) => e(format!("len({r})"), "int"),
+            ("isEmpty", 0) => e(format!("(len({r}) == 0)"), "boolean"),
+            ("isBlank", 0) => e(format!("({r}.strip() == \"\")"), "boolean"),
+            ("toString", 0) => e(format!("str({r})"), "String"),
+            ("toUpperCase", 0) => e(format!("{r}.upper()"), "String"),
+            ("toLowerCase", 0) => e(format!("{r}.lower()"), "String"),
+            ("trim", 0) | ("strip", 0) => e(format!("{r}.strip()"), "String"),
+            ("substring", 1) => e(format!("{r}[{}:]", a[0]), "String"),
+            ("substring", 2) => e(format!("{r}[{}:{}]", a[0], a[1]), "String"),
+            ("charAt", 1) => e(format!("{r}[{}]", a[0]), "String"),
+            ("indexOf", 1) => e(format!("{r}.find({})", a[0]), "int"),
+            ("lastIndexOf", 1) => e(format!("{r}.rfind({})", a[0]), "int"),
+            ("startsWith", 1) | ("endsWith", 1) => e(format!("{r}.{}({})", name.to_lowercase().replace("with", "with"), a[0]), "boolean"),
+            ("replace", 2) | ("replaceAll", 2) => {
+                if name == "replaceAll" {
+                    self.c.uses.insert("re");
+                    e(format!("re.sub({}, {}, {r})", a[0], a[1]), "String")
+                } else {
+                    e(format!("{r}.replace({}, {})", a[0], a[1]), "String")
+                }
+            }
+            ("split", 1) => {
+                self.c.uses.insert("re");
+                e(format!("re.split({}, {r})", a[0]), "")
+            }
+            ("contains", 1) if is_map => e(format!("({} in {r})", a[0]), "boolean"),
+            ("contains", 1) | ("containsKey", 1) => e(format!("({} in {r})", a[0]), "boolean"),
+            ("containsValue", 1) => e(format!("({} in {r}.values())", a[0]), "boolean"),
+            ("add", 1) if is_set => e(format!("{r}.add({})", a[0]), ""),
+            ("add", 1) | ("addLast", 1) | ("push", 1) | ("offer", 1) => e(format!("{r}.append({})", a[0]), ""),
+            ("add", 2) => e(format!("{r}.insert({}, {})", a[0], a[1]), ""),
+            ("addAll", 1) => e(format!("{r}.extend({})", a[0]), ""),
+            ("put", 2) => {
+                e(format!("{r}.__setitem__({}, {})", a[0], a[1]), "")
+            }
+            ("putAll", 1) => e(format!("{r}.update({})", a[0]), ""),
+            ("get", 1) if is_map => e(format!("{r}.get({})", a[0]), ""),
+            ("get", 1) => e(format!("{r}[{}]", a[0]), ""),
+            ("getOrDefault", 2) => e(format!("{r}.get({}, {})", a[0], a[1]), ""),
+            ("remove", 1) if is_map => e(format!("{r}.pop({}, None)", a[0]), ""),
+            ("remove", 1) => e(format!("{r}.remove({})", a[0]), ""),
+            ("clear", 0) => e(format!("{r}.clear()"), ""),
+            ("keySet", 0) => e(format!("{r}.keys()"), ""),
+            ("values", 0) => e(format!("{r}.values()"), ""),
+            ("entrySet", 0) => e(format!("{r}.items()"), ""),
+            ("getKey", 0) => e(format!("{r}[0]"), ""),
+            ("getValue", 0) => e(format!("{r}[1]"), ""),
+            ("append", 1) if ty == "String" || r.ends_with("sb") || ty == "StringBuilder" => e(format!("{r}.append({})", a[0]), ""),
+            ("orElse", 1) => {
+                self.c.uses.insert("rt");
+                e(format!("or_else({r}, {})", a[0]), "")
+            }
+            ("orElseGet", 1) => {
+                self.c.uses.insert("rt");
+                e(format!("or_else_get({r}, {})", a[0]), "")
+            }
+            ("orElseThrow", _) => {
+                self.c.uses.insert("rt");
+                e(format!("or_else_throw({r}{})", if n == 0 { String::new() } else { format!(", {}", a[0]) }), "")
+            }
+            ("isPresent", 0) => e(format!("({r} is not None)"), "boolean"),
+            ("isEmpty", _) => e(format!("({r} is None)"), "boolean"),
+            ("hashCode", 0) => e(format!("hash({r})"), "int"),
+            ("intValue", 0) | ("longValue", 0) => e(format!("int({r})"), "int"),
+            ("doubleValue", 0) => e(format!("float({r})"), "double"),
+            ("getMessage", 0) => e(format!("str({r})"), "String"),
+            ("printStackTrace", 0) => e("traceback.print_exc()".to_string(), ""),
+            ("incrementAndGet", 0) | ("getAndIncrement", 0) => {
+                e(format!("{r}.increment_and_get()"), "int")
+            }
+            ("stream", 0) | ("map", 1) | ("filter", 1) | ("collect", 1) | ("forEach", 1) | ("sorted", _) | ("reduce", _) | ("mapToInt", 1) => {
+                self.c.notes.push(format!("Stream API(.{name}) は未対応"));
+                e(format!("{r}.{}({})", snake(name), a.join(", ")), "")
+            }
+            _ => {
+                // get/is/set アクセサ: 他のクラスのメソッドとして定義がなければ属性へ
+                if !self.c.svc_methods.contains(name) && !self.c.methods.contains(name) {
+                    if let Some(prop) = name.strip_prefix("get").filter(|p| p.chars().next().is_some_and(|c| c.is_uppercase())) {
+                        if n == 0 {
+                            return e(format!("{r}.{}", lower_first(prop)), "");
+                        }
+                    }
+                    if let Some(prop) = name.strip_prefix("is").filter(|p| p.chars().next().is_some_and(|c| c.is_uppercase())) {
+                        if n == 0 {
+                            return e(format!("{r}.{}", lower_first(prop)), "boolean");
+                        }
+                    }
+                    if let Some(prop) = name.strip_prefix("set").filter(|p| p.chars().next().is_some_and(|c| c.is_uppercase())) {
+                        if n == 1 {
+                            let target = format!("{r}.{}", lower_first(prop));
+                            return E { s: format!("setattr({r}, \"{}\", {})", lower_first(prop), a[0]), ty: String::new(), setter: Some((target, a[0].clone())) };
+                        }
+                    }
+                }
+                if r == "self" && self.c.methods.contains(name) {
+                    return e(format!("self.{}({})", snake(name), a.join(", ")), "");
+                }
+                e(format!("{r}.{}({})", snake(name), a.join(", ")), "")
+            }
+        };
+        out
+    }
+
+    fn static_call(&mut self, r: &str, name: &str, args: &[E]) -> Option<E> {
+        let a: Vec<String> = args.iter().map(|x| x.s.clone()).collect();
+        let n = a.len();
+        let out = match (r, name) {
+            ("Math", "max") => e(format!("max({})", a.join(", ")), &args.first().map(|x| x.ty.clone()).unwrap_or_default()),
+            ("Math", "min") => e(format!("min({})", a.join(", ")), &args.first().map(|x| x.ty.clone()).unwrap_or_default()),
+            ("Math", "abs") => e(format!("abs({})", a[0]), &args[0].ty),
+            ("Math", "pow") => e(format!("({} ** {})", a[0], a[1]), "double"),
+            ("Math", "sqrt") => {
+                self.c.uses.insert("math");
+                e(format!("math.sqrt({})", a[0]), "double")
+            }
+            ("Math", "floor") | ("Math", "ceil") => {
+                self.c.uses.insert("math");
+                e(format!("float(math.{}({}))", name, a[0]), "double")
+            }
+            ("Math", "round") => e(format!("int(round({}))", a[0]), "int"),
+            ("Math", "random") => {
+                self.c.uses.insert("random");
+                e("random.random()".to_string(), "double")
+            }
+            ("Integer", "parseInt") | ("Integer", "valueOf") | ("Long", "parseLong") | ("Long", "valueOf") | ("Short", "parseShort") => e(format!("int({})", a[0]), "int"),
+            ("Double", "parseDouble") | ("Double", "valueOf") | ("Float", "parseFloat") => e(format!("float({})", a[0]), "double"),
+            ("Boolean", "parseBoolean") => e(format!("({}.lower() == \"true\")", a[0]), "boolean"),
+            ("Integer", "toString") | ("String", "valueOf") | ("Long", "toString") | ("Double", "toString") | ("Objects", "toString") => e(format!("str({})", a[0]), "String"),
+            ("Integer", "compare") | ("Long", "compare") | ("Double", "compare") => e(format!("(({0} > {1}) - ({0} < {1}))", a[0], a[1]), "int"),
+            ("Integer", "MAX_VALUE") => e("2147483647", "int"),
+            ("String", "format") => {
+                self.c.uses.insert("rt");
+                e(format!("jformat({})", a.join(", ")), "String")
+            }
+            ("String", "join") => e(format!("{}.join(str(x) for x in {})", a[0], if n == 2 { a[1].clone() } else { format!("[{}]", a[1..].join(", ")) }), "String"),
+            ("Objects", "equals") => e(format!("({} == {})", a[0], a[1]), "boolean"),
+            ("Objects", "isNull") => e(format!("({} is None)", a[0]), "boolean"),
+            ("Objects", "nonNull") => e(format!("({} is not None)", a[0]), "boolean"),
+            ("Objects", "requireNonNull") => e(a[0].clone(), ""),
+            ("Objects", "hash") | ("Objects", "hashCode") => e(format!("hash(({},))", a.join(", ")), "int"),
+            ("System", "currentTimeMillis") => {
+                self.c.uses.insert("time");
+                e("int(time.time() * 1000)".to_string(), "int")
+            }
+            ("System", "nanoTime") => {
+                self.c.uses.insert("time");
+                e("time.perf_counter_ns()".to_string(), "int")
+            }
+            ("System", "getenv") => {
+                self.c.uses.insert("os");
+                e(format!("os.environ.get({})", a[0]), "String")
+            }
+            ("System", "exit") => e(format!("sys.exit({})", a[0]), ""),
+            ("UUID", "randomUUID") => {
+                self.c.uses.insert("uuid");
+                e("str(uuid.uuid4())".to_string(), "String")
+            }
+            ("List", "of") | ("Arrays", "asList") | ("Set", "of") | ("Stream", "of") => e(
+                if n == 1 && (r == "Arrays" || args[0].ty.ends_with("[]")) { format!("list({})", a[0]) } else if r == "Set" { format!("{{{}}}", a.join(", ")) } else { format!("[{}]", a.join(", ")) },
+                if r == "Set" { "Set" } else { "List" },
+            ),
+            ("Map", "of") => {
+                let pairs: Vec<String> = a.chunks(2).map(|c| format!("{}: {}", c[0], c.get(1).cloned().unwrap_or_default())).collect();
+                e(format!("{{{}}}", pairs.join(", ")), "Map")
+            }
+            ("Collections", "emptyList") => e("[]", "List"),
+            ("Collections", "emptyMap") => e("{}", "Map"),
+            ("Collections", "emptySet") => e("set()", "Set"),
+            ("Collections", "sort") => e(format!("{}.sort()", a[0]), ""),
+            ("Collections", "unmodifiableList") | ("Collections", "unmodifiableMap") | ("Collections", "unmodifiableSet") => e(a[0].clone(), ""),
+            ("Optional", "of") | ("Optional", "ofNullable") => e(a[0].clone(), ""),
+            ("Optional", "empty") => e("None", ""),
+            ("ResponseEntity", "ok") | ("Response", "ok") => e(a.first().cloned().unwrap_or_else(|| "None".into()), ""),
+            ("ResponseEntity", "notFound") | ("ResponseEntity", "noContent") | ("ResponseEntity", "badRequest") | ("ResponseEntity", "accepted") | ("ResponseEntity", "created") | ("ResponseEntity", "status") | ("Response", "status") | ("Response", "created") | ("Response", "noContent") => {
+                self.c.uses.insert("rt");
+                e(format!("ResponseBuilder(\"{name}\", {})", if a.is_empty() { "None".to_string() } else { a[0].clone() }), "")
+            }
+            ("LocalDate", "now") | ("LocalDateTime", "now") | ("Instant", "now") => {
+                self.c.uses.insert("datetime");
+                e("datetime.datetime.now()".to_string(), "")
+            }
+            ("Thread", "sleep") => {
+                self.c.uses.insert("time");
+                e(format!("time.sleep({} / 1000)", a[0]), "")
+            }
+            _ => return None,
+        };
+        Some(out)
+    }
+
+    /// サーブレット(request/response)・Spark(req/res)・Javalin(ctx)の入出力。
+    fn web_call(&mut self, r: &str, name: &str, args: &[E]) -> Option<E> {
+        let lit = |i: usize| -> Option<String> { args.get(i).map(|x| x.s.trim_matches('"').to_string()) };
+        let out = match name {
+            "getParameter" | "queryParams" | "queryParam" | "getParam" => {
+                let q = lit(0)?;
+                let v = self.c.query_vars.get(&q).cloned().unwrap_or_else(|| snake(&q));
+                e(v, "String")
+            }
+            "pathParam" | "params" if !args.is_empty() => {
+                let q = lit(0)?;
+                let q = q.trim_start_matches(':').to_string();
+                e(self.c.path_vars.get(&q).cloned().unwrap_or_else(|| snake(&q)), "String")
+            }
+            "body" if args.is_empty() && (self.c.lambda_params.iter().any(|p| snake(p) == r) || r == "request") => e(self.c.body_var.clone().unwrap_or_else(|| "body".into()), "String"),
+            "bodyAsClass" => e(self.c.body_var.clone().unwrap_or_else(|| "body".into()), ""),
+            "getWriter" if args.is_empty() => e("_out", ""),
+            "println" | "print" | "write" | "append" if r == "_out" || r.starts_with("out") || r.ends_with("writer") || r.ends_with("_out") => {
+                let nl = if name == "println" { "\\n" } else { "" };
+                e(format!("_out.append(str({}) + \"{}\")", args.first().map(|x| x.s.clone()).unwrap_or_else(|| "\"\"".into()), nl), "")
+            }
+            "result" | "json" | "html" | "send" if self.c.lambda_params.iter().any(|p| snake(p) == r) => e(format!("\u{1}{}", args.first().map(|x| x.s.clone()).unwrap_or_default()), ""),
+            "status" if self.c.lambda_params.iter().any(|p| snake(p) == r) => e("None", ""),
+            "setContentType" | "setCharacterEncoding" | "setHeader" | "type" | "header" | "addHeader" | "setStatus" if r == "response" || r == "resp" || self.c.lambda_params.iter().any(|p| snake(p) == r) => e("None", ""),
+            "getRequestDispatcher" | "forward" | "sendRedirect" => {
+                self.c.notes.push(format!("{name} は未対応(画面遷移)"));
+                return None;
+            }
+            "getSession" | "getAttribute" | "setAttribute" if r == "request" || r == "req" => {
+                self.c.notes.push(format!("{name}(セッション)は未対応"));
+                return None;
+            }
+            _ => return None,
+        };
+        Some(out)
+    }
+}
+
+fn paren_if_or(s: &str, op: &str) -> String {
+    if op == "and" && s.contains(" or ") && !s.starts_with('(') {
+        format!("({s})")
+    } else {
+        s.to_string()
+    }
+}
+
+fn wrap_cmp(s: &str) -> String {
+    if s.contains(' ') && !s.starts_with('(') && !s.starts_with("not ") && (s.contains(" == ") || s.contains(" and ") || s.contains(" or ") || s.contains(" < ") || s.contains(" > ") || s.contains(" is ") || s.contains(" != ") || s.contains(" in ")) {
+        format!("({s})")
+    } else {
+        s.to_string()
+    }
+}
+
+fn str_wrap(x: &E) -> String {
+    if x.ty == "String" || x.s.starts_with('"') && x.s.ends_with('"') && x.s.len() >= 2 {
+        x.s.clone()
+    } else if x.s.starts_with("str(") {
+        x.s.clone()
+    } else {
+        format!("str({})", x.s)
+    }
+}
+
+fn norm_ty(t: &str) -> String {
+    let base = t.split('<').next().unwrap_or(t).to_string();
+    base
+}
+
+fn py_str(s: &str) -> String {
+    let mut o = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            '\t' => o.push_str("\\t"),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+pub fn default_value(ty: &str) -> String {
+    match ty {
+        "int" | "long" | "short" | "byte" => "0".into(),
+        "double" | "float" => "0.0".into(),
+        "boolean" => "False".into(),
+        "char" => "\"\"".into(),
+        _ => "None".into(),
+    }
+}
+
+fn exc_map(t: &str) -> String {
+    match t {
+        "IOException" | "FileNotFoundException" | "UncheckedIOException" => "OSError".into(),
+        "NumberFormatException" => "ValueError".into(),
+        "IllegalArgumentException" => "ValueError".into(),
+        "IllegalStateException" | "RuntimeException" | "Throwable" | "Exception" | "Error" => "Exception".into(),
+        "NullPointerException" => "AttributeError".into(),
+        "IndexOutOfBoundsException" | "ArrayIndexOutOfBoundsException" => "IndexError".into(),
+        "UnsupportedOperationException" => "NotImplementedError".into(),
+        "NoSuchElementException" => "LookupError".into(),
+        "InterruptedException" => "KeyboardInterrupt".into(),
+        o => o.to_string(),
+    }
+}
+
+fn inst_map(t: &str) -> String {
+    match t {
+        "String" => "str".into(),
+        "Integer" | "Long" | "Short" => "int".into(),
+        "Double" | "Float" => "float".into(),
+        "Boolean" => "bool".into(),
+        "List" | "ArrayList" | "Collection" => "list".into(),
+        "Map" | "HashMap" => "dict".into(),
+        "Set" | "HashSet" => "set".into(),
+        "Object" => "object".into(),
+        o => o.to_string(),
+    }
+}
+
+fn status_from(s: &str) -> u16 {
+    let up = s.rsplit('.').next().unwrap_or("").to_uppercase();
+    match up.as_str() {
+        "NOT_FOUND" => 404,
+        "BAD_REQUEST" => 400,
+        "UNAUTHORIZED" => 401,
+        "FORBIDDEN" => 403,
+        "CONFLICT" => 409,
+        "NOT_IMPLEMENTED" => 501,
+        "UNPROCESSABLE_ENTITY" => 422,
+        "NO_CONTENT" => 204,
+        "CREATED" => 201,
+        "OK" => 200,
+        _ => s.parse().unwrap_or(500),
+    }
+}
+
+/// `for (int i = A; i < B; i++)` を range に。
+fn classic_range(init: &[Tok], cond: &[Tok], upd: &[Tok], tr: &mut Tr) -> Option<(String, String, String, i64)> {
+    let ids: Vec<&Tok> = init.iter().filter(|t| !t.id("final")).collect();
+    let eq = ids.iter().position(|t| t.is("="))?;
+    let var = match ids.get(eq.checked_sub(1)?)? {
+        Tok::Id(s) => s.clone(),
+        _ => return None,
+    };
+    let a_toks: Vec<Tok> = ids[eq + 1..].iter().map(|t| (*t).clone()).collect();
+    let a = tr.sub_expr(&a_toks).s;
+    if cond.len() < 3 || !cond[0].id(&var) {
+        return None;
+    }
+    let (op, rest) = match &cond[1] {
+        Tok::P(p) if p == "<" || p == "<=" || p == ">" || p == ">=" => (p.clone(), &cond[2..]),
+        _ => return None,
+    };
+    let b = tr.sub_expr(rest).s;
+    let u: Vec<String> = upd.iter().map(|t| t.text()).collect();
+    let step: i64 = match u.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
+        [v, "++"] | ["++", v] if *v == var => 1,
+        [v, "--"] | ["--", v] if *v == var => -1,
+        [v, "+=", k] if *v == var => k.parse().ok()?,
+        [v, "-=", k] if *v == var => -(k.parse::<i64>().ok()?),
+        _ => return None,
+    };
+    let (end, ok) = match (op.as_str(), step > 0) {
+        ("<", true) | (">", false) => (b, true),
+        ("<=", true) => (format!("{b} + 1"), true),
+        (">=", false) => (format!("{b} - 1"), true),
+        _ => (String::new(), false),
+    };
+    ok.then_some((var, a, end, step))
+}
+
+/// メソッド本体(`{ }` の内側のトークン)を Python の行へ。
+pub fn translate_body(toks: &[Tok], ctx: &mut Ctx, ind: usize) -> Vec<String> {
+    let mut out = vec![];
+    let mut tr = Tr::new(toks, ctx);
+    tr.stmts(ind, &mut out);
+    if out.is_empty() {
+        out.push(format!("{}pass", "    ".repeat(ind)));
+    }
+    out
+}
+
+/// 1つの式(ラムダ本体など)を変換。
+pub fn translate_expr(toks: &[Tok], ctx: &mut Ctx) -> String {
+    let mut tr = Tr::new(toks, ctx);
+    tr.expr(0).s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::lex;
+
+    fn tb(src: &str) -> String {
+        let mut c = Ctx::default();
+        translate_body(&lex(src), &mut c, 1).join("\n")
+    }
+
+    #[test]
+    fn if_for_return() {
+        let p = tb("int total = 0; for (int i = 0; i < n; i++) { total += i; } if (total > 10 && flag) { return \"big\"; } else { return \"small\" + total; }");
+        assert!(p.contains("total = 0"), "{p}");
+        assert!(p.contains("for i in range(n):"), "{p}");
+        assert!(p.contains("total += i"), "{p}");
+        assert!(p.contains("if total > 10 and flag:"), "{p}");
+        assert!(p.contains("return \"small\" + str(total)"), "{p}");
+    }
+    #[test]
+    fn collections_and_try() {
+        let p = tb("List<String> xs = new ArrayList<>(); xs.add(\"a\"); for (String s : xs) { System.out.println(s.toUpperCase()); } try { x = Integer.parseInt(v); } catch (NumberFormatException e) { return null; }");
+        assert!(p.contains("xs = []"), "{p}");
+        assert!(p.contains("xs.append(\"a\")"), "{p}");
+        assert!(p.contains("for s in xs:"), "{p}");
+        assert!(p.contains("print(s.upper())"), "{p}");
+        assert!(p.contains("except ValueError as e:"), "{p}");
+    }
+    #[test]
+    fn throw_maps_to_http() {
+        let p = tb("throw new NotFoundException(\"no\");");
+        assert!(p.contains("raise HTTPException(status_code=404, detail=\"no\")"), "{p}");
+    }
+    #[test]
+    fn unsupported_is_loud() {
+        let p = tb("switch (x) { case 1: break; }");
+        assert!(p.contains("TODO(Java_to)"), "{p}");
+    }
+    #[test]
+    fn integer_division_and_cast() {
+        let p = tb("int a = 7; int b = a / 2; double d = (double) a / 2;");
+        assert!(p.contains("b = a // 2"), "{p}");
+        assert!(p.contains("d = float(a) / 2"), "{p}");
+    }
+}

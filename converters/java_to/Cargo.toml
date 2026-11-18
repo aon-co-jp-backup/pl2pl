@@ -1,0 +1,9 @@
+[package]
+name = "java_to"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Java (Servlet/Struts/Spring/JAX-RS/Micronaut/Quarkus/Javalin/Spark...) to FastAPI / MFastAPI / Poem / RPoem converter with framework auto-detection (2000-2026)"
+
+[dependencies]
+walkdir = "2"

@@ -1,0 +1,129 @@
+name: release
+# Pushing a v* tag builds each OS installer, smoke-tests it (install -> run -> remove) and attaches it to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: End-to-end (convert samples to FastAPI and run them)
+        run: |
+          pip install fastapi httpx pytest
+          bash tests/run-e2e.sh
+      - name: Rust outputs compile (poem)
+        run: bash tests/run-rust.sh
+
+  windows:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-latest, arch: x64, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, arch: arm64, target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          $iscc = if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") { "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" } else { (Get-Command iscc).Source }
+          $ver = "${{ github.ref_name }}".TrimStart('v'); if ($ver -notmatch '^\d') { $ver = "0.0.0" }
+          & $iscc /Q "/DAppVersion=$ver" "/DArch=${{ matrix.arch }}" "/DExeDir=..\target\${{ matrix.target }}\release" installer\java_to.iss
+      - name: Smoke test (install, run, uninstall)
+        shell: pwsh
+        run: |
+          $d = "$env:RUNNER_TEMP\jt"
+          Start-Process dist\Java_to-Setup-${{ matrix.arch }}.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER","/DIR=$d" -Wait
+          & "$d\java_to.exe" convert tests\samples\spring --target fastapi --out "$env:RUNNER_TEMP\out"
+          if (-not (Test-Path "$env:RUNNER_TEMP\out\main.py")) { throw "conversion failed" }
+          Start-Process "$d\unins000.exe" -ArgumentList "/VERYSILENT" -Wait
+          if (Test-Path $d) { throw "uninstall left files" }
+      - uses: actions/upload-artifact@v4
+        with: { name: "win-${{ matrix.arch }}", path: dist/*.exe }
+
+  linux:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Package
+        run: |
+          ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
+          bash installer/build-deb.sh target/release/java_to "$ver" ${{ matrix.arch }} dist
+          tar czf "dist/java_to-$ver-linux-${{ matrix.arch }}.tar.gz" -C target/release java_to -C ../.. README.md LICENSE
+      - name: Smoke test (install, run, remove)
+        run: |
+          sudo dpkg -i dist/*.deb
+          java_to convert tests/samples/spring --target rpoem --out "$RUNNER_TEMP/out"
+          test -f "$RUNNER_TEMP/out/src/main.rs"
+          sudo dpkg -r java-to
+          hash -r; test ! -e /usr/bin/java_to
+      - uses: actions/upload-artifact@v4
+        with: { name: "linux-${{ matrix.arch }}", path: "dist/*" }
+
+  macos:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, arch: arm64, target: aarch64-apple-darwin }
+          - { runner: macos-15-intel, arch: x64, target: x86_64-apple-darwin }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package (.pkg, unsigned)
+        run: |
+          ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
+          bash installer/build-pkg.sh target/${{ matrix.target }}/release/java_to "$ver" ${{ matrix.arch }} dist
+      - name: Smoke test (install, run)
+        run: |
+          sudo installer -pkg dist/*.pkg -target /
+          /usr/local/bin/java_to convert tests/samples/spring --target rpoem --out "$RUNNER_TEMP/out"
+          test -f "$RUNNER_TEMP/out/src/main.rs"
+      - uses: actions/upload-artifact@v4
+        with: { name: "macos-${{ matrix.arch }}", path: dist/*.pkg }
+
+  publish:
+    needs: [windows, linux, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: SHA-256 and Release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cd out && sha256sum * > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "Installers per OS. SHA-256: SHA256SUMS.txt" *
