@@ -58,7 +58,7 @@ CI(`.github/workflows/test.yml`)が push ごとに単体テストと PHP の通�
 
 ## 完成予定の機能(未了)
 - PHP: `@can` 系の認可とクラスベースの Blade コンポーネント。
-- COBOL_to・Java_to は `converters/` に取り込み済み(履歴つきのスナップショット、cobol_to 10件・java_to 15件のテストが通る)。残り: `pl2pl web` を同梱コピーへ切り替える、元リポジトリのその後の変更を取り込む、元リポジトリの削除(所有者の指示。削除は元に戻せないので事前に確認)。
+- COBOL_to・Java_to は `converters/` に取り込み済み(履歴つきのスナップショット、cobol_to 10件・java_to 15件のテストが通る)。`pl2pl web` は同梱コピー(実行ファイルの隣か `components/bin/`)を先に使う。残り: 元リポジトリのその後の変更を取り込む、元リポジトリの削除(所有者の指示。削除は元に戻せないので事前に確認)。
 - 共通の中間表現(サーバー側・DB/SQL・画面側)。
 - aruaru-llm との連携(`llm setup` の実導入は未確認)。
 - Kokkos の GPU 実行・`Kokkos::View`、open-cuda / open-directx 上のカーネル実行。

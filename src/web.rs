@@ -61,6 +61,25 @@ pub fn plan(dir: &Path, out: &Path, target: &str) -> Vec<Job> {
     v
 }
 
+/// 同梱の変換器を探す。pl2pl の実行ファイルと同じ場所(`<名前>`)か `components/bin/` にあればそれを使い、
+/// 無ければ PATH 上の名前をそのまま返す(従来どおり)。
+fn resolve_in(dirs: &[std::path::PathBuf], name: &str) -> std::path::PathBuf {
+    let file = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+    for d in dirs {
+        for c in [d.join(&file), d.join("components").join("bin").join(&file)] {
+            if c.is_file() {
+                return c;
+            }
+        }
+    }
+    std::path::PathBuf::from(name)
+}
+
+fn resolve_program(name: &str) -> std::path::PathBuf {
+    let dirs: Vec<std::path::PathBuf> = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| vec![p.to_path_buf()])).unwrap_or_default();
+    resolve_in(&dirs, name)
+}
+
 pub fn run(dir: &Path, out: &Path, target: &str, dry: bool) -> i32 {
     let jobs = plan(dir, out, target);
     if jobs.is_empty() {
@@ -73,7 +92,7 @@ pub fn run(dir: &Path, out: &Path, target: &str, dry: bool) -> i32 {
         if dry {
             continue;
         }
-        match Command::new(&j.program).args(&j.args).status() {
+        match Command::new(resolve_program(&j.program)).args(&j.args).status() {
             Ok(s) if s.success() => {}
             Ok(s) => {
                 eprintln!("  失敗(終了コード {:?})", s.code());
@@ -95,6 +114,19 @@ pub fn run(dir: &Path, out: &Path, target: &str, dry: bool) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bundled_converter_is_preferred() {
+        let d = std::env::temp_dir().join(format!("pl2pl_res_{}", std::process::id()));
+        std::fs::create_dir_all(d.join("components").join("bin")).unwrap();
+        let file = if cfg!(windows) { "java_to.exe" } else { "java_to" };
+        assert_eq!(resolve_in(&[d.clone()], "java_to"), std::path::PathBuf::from("java_to")); // 無ければ PATH の名前
+        std::fs::write(d.join("components").join("bin").join(file), "x").unwrap();
+        assert_eq!(resolve_in(&[d.clone()], "java_to"), d.join("components").join("bin").join(file));
+        std::fs::write(d.join(file), "x").unwrap();
+        assert_eq!(resolve_in(&[d.clone()], "java_to"), d.join(file)); // 実行ファイルの隣が先
+        std::fs::remove_dir_all(&d).ok();
+    }
+
     #[test]
     fn plans_by_content() {
         let d = std::env::temp_dir().join(format!("pl2pl_web_{}", std::process::id()));

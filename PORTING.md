@@ -4,7 +4,7 @@ v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し
 PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
 1. PHP: `@can` 系の認可・クラスベースの Blade コンポーネント(`@component`)・`$attributes`・`@php`・`morphToMany`。
-2. COBOL_to・Java_to は `converters/` へ取り込み済み。残り: `pl2pl web` を同梱コピーへ切り替える・元リポジトリのその後の変更の取り込み・元リポジトリの削除(所有者の指示。**削除は元に戻せないので最終確認を取る**。別セッションが元リポジトリで開発を続けている可能性がある)。
+2. COBOL_to・Java_to は `converters/` へ取り込み済み。残り: 元リポジトリのその後の変更の取り込み・元リポジトリの削除(所有者の指示。**削除は元に戻せないので最終確認を取る**。別セッションが元リポジトリで開発を続けている可能性がある)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
 5. Kokkos の GPU 実行・`Kokkos::View` への置き換え、open-cuda / open-directx 上のカーネル実行。
@@ -71,3 +71,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記20**: `.github/workflows/test.yml` を追加し、push・PR ごとに単体テストと PHP 通し試験を Linux x64・Linux arm64(ubuntu-24.04-arm)・macOS で実行。3 OS とも成功(run 44416117420)。未了の7番(新サンプルの CI 実行)は解消。
 
 **2026-11-19 追記21**: COBOL_to(`4bf7670`)と Java_to(`22a9193`)を `git subtree` で `converters/cobol_to`・`converters/java_to` へ履歴つきで取り込んだ。pl2pl 内で `cargo test` が通る(cobol_to 10件・java_to 15件)、pl2pl 本体のビルドも成功。**元リポジトリは削除していない**(所有者の最終確認待ち)。取り込み後に元で増えた変更は、`git subtree pull` で追従できる。`pl2pl web` はまだ外部の実行ファイル名を呼ぶ(同梱コピーへの切り替えは未了)。
+
+**2026-11-19 追記22**: `pl2pl web` が、実行ファイルの隣か `components/bin/` にある変換器を先に使い、無ければ PATH の名前を呼ぶようにした(`resolve_in`、単体テストあり)。配布物を作る前に `bash installer/build-converters.sh` で `converters/` の2つをビルドして `components/bin/` へ置く(bundle-components.sh と同じ置き場所)。未了: リリースのワークフローがこのスクリプトを呼んで配布物へ入れること、元リポジトリの削除(最終確認待ち)。
