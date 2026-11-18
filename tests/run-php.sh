@@ -53,7 +53,8 @@ assert c.get("/private/me", headers=ok).json() == {"me": 1}
 assert c.get("/private/me", headers=ok).json() == {"me": 1}
 r3 = c.get("/private/me", headers=ok)
 assert r3.status_code == 429 and "Retry-After" in r3.headers, r3.text
-assert c.get("/after").json() == "x"
+ra = c.get("/after")
+assert ra.json() == "x" and ra.headers.get("X-Local") == "1", ra.headers
 assert c.get("/guestonly").json() == "g"
 assert c.get("/guestonly", headers=ok, follow_redirects=False).status_code == 302
 uid = c.post("/users", json={"name": "rel", "age": 40}).json()["id"]

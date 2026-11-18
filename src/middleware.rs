@@ -170,8 +170,12 @@ fn reject_stmt(stmt: &str) -> Result<String, String> {
 
 /// 独自ミドルウェアの `handle` の本体 → Python の行。
 /// 形: `if (条件) { 拒否 }` を並べ、最後に `return $next($request);`。
-pub fn compile_handle(body: &str) -> Result<Vec<String>, String> {
+pub fn compile_handle(body: &str) -> Result<(Vec<String>, bool), String> {
     let mut lines = vec![];
+    let mut resp_var: Option<String> = None;
+    let mut headers: Vec<String> = vec![];
+    let assign = Regex::new(r"^\$(\w+)\s*=\s*\$next\(\s*\$request\s*\)\s*;").unwrap();
+    let hdr = Regex::new(r#"^\$(\w+)\s*->\s*(?:header|headers\s*->\s*set)\(\s*('[^']*'|"[^"]*")\s*,\s*('[^']*'|"[^"]*")\s*\)\s*;"#).unwrap();
     let b = body.trim();
     let mut i = 0;
     let bytes = b.as_bytes();
@@ -209,10 +213,23 @@ pub fn compile_handle(body: &str) -> Result<Vec<String>, String> {
             if b[i..].trim_start().starts_with("else") {
                 return Err("else は未対応".into());
             }
+        } else if let Some(c) = assign.captures(rest) {
+            if resp_var.is_some() {
+                return Err("`$next($request)` が複数回ある".into());
+            }
+            resp_var = Some(c[1].to_string());
+            i += c.get(0).unwrap().end();
+        } else if let (Some(v), Some(c)) = (resp_var.as_ref(), hdr.captures(rest)) {
+            if &c[1] != v {
+                return Err("`$next` の結果以外へのヘッダー設定は未対応".into());
+            }
+            headers.push(format!("    response.headers[{}] = {}", &c[2], &c[3]));
+            i += c.get(0).unwrap().end();
         } else if rest.starts_with("return") {
             let end = rest.find(';').ok_or("return が閉じていない")?;
             let r = rest[6..end].trim();
-            if Regex::new(r"^\$next\(\s*\$request\s*\)$").unwrap().is_match(r) {
+            let is_next = Regex::new(r"^\$next\(\s*\$request\s*\)$").unwrap().is_match(r);
+            if is_next && resp_var.is_none() || resp_var.as_deref().map(|v| r == format!("${v}")).unwrap_or(false) {
                 done = true;
                 i += end + 1;
             } else {
@@ -226,10 +243,12 @@ pub fn compile_handle(body: &str) -> Result<Vec<String>, String> {
     if !done {
         return Err("`return $next($request)` が見つからない".into());
     }
+    let uses_response = !headers.is_empty();
+    lines.extend(headers);
     if lines.is_empty() {
         lines.push("    pass".into());
     }
-    Ok(lines)
+    Ok((lines, uses_response))
 }
 
 /// クラス名 → `handle` の本体
@@ -298,9 +317,10 @@ impl Registry {
         let class = aliases.get(base).cloned().unwrap_or_else(|| base.to_string());
         match custom.get(&class) {
             Some(body) => match compile_handle(body) {
-                Ok(lines) => {
+                Ok((lines, uses_response)) => {
                     let name = format!("mw_{}", snake_case(&class));
-                    self.add(&name, format!("def {name}(request: Request):\n    \"\"\"Laravel ミドルウェア {class} の移植\"\"\"\n{}\n", lines.join("\n")));
+                    let extra = if uses_response { ", response: Response" } else { "" };
+                    self.add(&name, format!("def {name}(request: Request{extra}):\n    \"\"\"Laravel ミドルウェア {class} の移植\"\"\"\n{}\n", lines.join("\n")));
                     Some(name)
                 }
                 Err(why) => {
@@ -336,7 +356,7 @@ import fnmatch
 import os
 import time
 
-from fastapi import Request
+from fastapi import Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 
@@ -404,11 +424,13 @@ mod tests {
     #[test]
     fn handle_guards() {
         let body = "if (!$request->header('X-Token')) { return response()->json(['error' => 'no token'], 401); }\n if ($request->ip() === '1.2.3.4') abort(403);\n return $next($request);";
-        let l = compile_handle(body).unwrap();
+        let (l, _) = compile_handle(body).unwrap();
         assert!(l[0].contains("if not request.headers.get('X-Token'):"), "{l:?}");
         assert!(l[0].contains("JSONResponse({\"error\": \"no token\"}, status_code=401)"), "{l:?}");
         assert!(l[1].contains("== '1.2.3.4'") && l[1].contains("status_code=403"), "{l:?}");
-        assert!(compile_handle("$r = $next($request); $r->header('a','b'); return $r;").is_err());
+        let (l2, uses) = compile_handle("$r = $next($request); $r->header('a','b'); return $r;").unwrap();
+        assert!(uses && l2.iter().any(|x| x.contains("response.headers['a'] = 'b'")), "{l2:?}");
+        assert!(compile_handle("$r = $next($request); $r->foo(); return $r;").is_err());
         assert!(compile_handle("foo(); return $next($request);").is_err());
     }
 }

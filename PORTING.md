@@ -3,7 +3,7 @@
 v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
 PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
-1. PHP: リレーションの残り(`morph` 系)、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+1. PHP: リレーションの残り(`morph` 系)、Blade のコンポーネント・スタック・認可系。
 2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
@@ -60,3 +60,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記14**: `docs/i18n/` の9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt)を、直訳調をやめて各言語の自然な言い回しで書き直した(ネイティブの検証は未実施)。ネストした `with` の対応も反映。
 
 **2026-11-19 追記15**: PHP の `cursorPaginate()` を変換(cursor は「何件目から」を base64 にした近似で、Laravel の列値ベースとは異なる)。実SQLiteの通し試験成功、i18n 9言語も追従。未対応: `morph` 系・Blade のコンポーネント/スタック/認可系・`$next` 後処理のミドルウェア。
+
+**2026-11-19 追記16**: `$r = $next($request); $r->header('K','V'); return $r;` 形の独自ミドルウェアを変換(`Response` を依存で受けてヘッダーを付ける)。ヘッダー追加のみ対応で、ボディの加工は TODO。ルートが `Response` を直接返すときは付かない。実FastAPIの通し試験成功(単体30件)。未対応: `morph` 系・Blade のコンポーネント/スタック/認可系。
