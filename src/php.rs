@@ -140,6 +140,153 @@ fn simple_return(body: &str) -> Option<String> {
     php_value(&b)
 }
 
+/// `return Model::find($id);` など単純な Eloquent の静的呼び出し → Python(`Model.find(id)`)。使うモデル名も返す。
+fn eloquent_return(body: &str) -> Option<(String, String)> {
+    let b = body.trim().strip_prefix("return")?.trim().trim_end_matches(';').trim();
+    let c = Regex::new(r"^(\w+)::(all|find|findOrFail|create|destroy)\((.*)\)$").unwrap().captures(b)?;
+    let (model, op, arg) = (c[1].to_string(), c[2].to_string(), c[3].trim().to_string());
+    let a = if Regex::new(r"^\$\w+$").unwrap().is_match(&arg) { arg[1..].to_string() } else if Regex::new(r"^\$\w+->all\(\)$").unwrap().is_match(&arg) { "payload or {}".to_string() } else if arg.is_empty() { String::new() } else { return None };
+    let op = if op == "findOrFail" { "find_or_fail" } else { op.as_str() };
+    Some((model.clone(), format!("{model}.{op}({a})")))
+}
+
+type Schema = HashMap<String, (String, Vec<(String, &'static str)>)>; // モデル → (テーブル, 列)
+
+fn lower_snake(n: &str) -> String {
+    let mut o = String::new();
+    for (i, ch) in n.chars().enumerate() {
+        if ch.is_uppercase() && i > 0 {
+            o.push('_');
+        }
+        o.extend(ch.to_lowercase());
+    }
+    o
+}
+
+fn guess_table(model: &str) -> String {
+    let n = lower_snake(model);
+    if let Some(stem) = n.strip_suffix('y') { format!("{stem}ies") } else if n.ends_with('s') { format!("{n}es") } else { format!("{n}s") }
+}
+
+fn col_type(laravel: &str) -> Option<&'static str> {
+    Some(match laravel {
+        "string" | "char" | "date" | "dateTime" | "timestamp" | "uuid" => "String(255)",
+        "text" | "longText" | "mediumText" => "Text",
+        "integer" | "bigInteger" | "unsignedBigInteger" | "unsignedInteger" | "smallInteger" | "tinyInteger" | "unsignedSmallInteger" | "unsignedTinyInteger" | "foreignId" => "Integer",
+        "boolean" => "Boolean",
+        "float" | "double" | "decimal" => "Float",
+        "json" => "JSON",
+        _ => return None,
+    })
+}
+
+/// マイグレーション(`Schema::create`)と Eloquent モデル(`$fillable`・`$table`)から列を集める。
+fn collect_schema(files: &[(String, String)]) -> Schema {
+    let mut tables: HashMap<String, Vec<(String, &'static str)>> = HashMap::new();
+    let create = Regex::new(r#"Schema::create\(\s*['"](\w+)['"]\s*,\s*function\s*\([^)]*\)\s*\{"#).unwrap();
+    let colre = Regex::new(r#"\$table->(\w+)\(\s*['"](\w+)['"]"#).unwrap();
+    for (_, src) in files {
+        for c in create.captures_iter(src) {
+            let open = c.get(0).unwrap().end() - 1;
+            let Some(close) = matching(src, open, '{', '}') else { continue };
+            let cols: Vec<(String, &'static str)> = colre.captures_iter(&src[open + 1..close]).filter_map(|m| col_type(&m[1]).map(|t| (m[2].to_string(), t))).collect();
+            tables.insert(c[1].to_string(), cols);
+        }
+    }
+    let mut out = Schema::new();
+    let cls = Regex::new(r"class\s+(\w+)\s+extends\s+(?:Model|Authenticatable|\w*Model)\b").unwrap();
+    let fill = Regex::new(r#"\$fillable\s*=\s*\[([^\]]*)\]"#).unwrap();
+    let tbl = Regex::new(r#"\$table\s*=\s*['"](\w+)['"]"#).unwrap();
+    for (_, src) in files {
+        let Some(c) = cls.captures(src) else { continue };
+        let model = c[1].to_string();
+        let table = tbl.captures(src).map(|t| t[1].to_string()).unwrap_or_else(|| guess_table(&model));
+        let cols = match tables.get(&table) {
+            Some(c) if !c.is_empty() => c.clone(),
+            _ => fill.captures(src).map(|f| Regex::new(r#"['"](\w+)['"]"#).unwrap().captures_iter(&f[1]).map(|m| (m[1].to_string(), "String(255)")).collect()).unwrap_or_default(),
+        };
+        out.insert(model, (table, cols));
+    }
+    out
+}
+
+const DB_PY: &str = r##""""pl2pl が生成した DB 層(SQLAlchemy)。接続先は環境変数 DATABASE_URL(既定は SQLite のファイル)。"""
+import os
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:///./app.db"))
+Session = sessionmaker(engine, expire_on_commit=False)
+Base = declarative_base()
+"##;
+
+const MODEL_PY: &str = r##"
+
+class __M__(Base):
+    """Eloquent モデル __M__ の SQLAlchemy 版(テーブル __T__)。マイグレーションに無い項目は extra(JSON)へ入る。"""
+    __tablename__ = "__T__"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+__COLS__    extra = Column(JSON, default=dict)
+    COLUMNS = (__NAMES__)
+
+    def to_dict(self):
+        d = {"id": self.id}
+        for c in self.COLUMNS:
+            d[c] = getattr(self, c)
+        d.update(self.extra or {})
+        return d
+
+    @classmethod
+    def all(cls):
+        with Session() as s:
+            return [r.to_dict() for r in s.query(cls).order_by(cls.id)]
+
+    @classmethod
+    def find(cls, id):
+        with Session() as s:
+            r = s.get(cls, int(id))
+            return r.to_dict() if r else None
+
+    @classmethod
+    def find_or_fail(cls, id):
+        r = cls.find(id)
+        if r is None:
+            raise HTTPException(status_code=404, detail="__M__ not found")
+        return r
+
+    @classmethod
+    def destroy(cls, id):
+        with Session() as s:
+            r = s.get(cls, int(id))
+            if r is None:
+                return 0
+            s.delete(r)
+            s.commit()
+            return 1
+
+    @classmethod
+    def create(cls, data):
+        data = dict(data or {})
+        row = cls(**{k: data.pop(k) for k in list(data) if k in cls.COLUMNS}, extra=data)
+        with Session() as s:
+            s.add(row)
+            s.commit()
+            return row.to_dict()
+"##;
+
+fn models_py(models: &[String], schema: &Schema) -> String {
+    let mut o = String::from("\"\"\"pl2pl が生成したモデル(SQLAlchemy)。\"\"\"\nfrom fastapi import HTTPException\nfrom sqlalchemy import JSON, Boolean, Column, Float, Integer, String, Text\n\nfrom db import Base, Session, engine\n");
+    for m in models {
+        let (t, cols) = schema.get(m).cloned().unwrap_or_else(|| (guess_table(m), vec![]));
+        let cs: String = cols.iter().map(|(n, ty)| format!("    {n} = Column({ty})\n")).collect();
+        let names: String = cols.iter().map(|(n, _)| format!("{n:?}, ")).collect();
+        o.push_str(&MODEL_PY.replace("__M__", m).replace("__T__", &t).replace("__COLS__", &cs).replace("__NAMES__", &names));
+    }
+    o.push_str("\n\nBase.metadata.create_all(engine)\n");
+    o
+}
+
 type Sigs = HashMap<(String, String), Vec<(String, String)>>; // (class, method) → [(名前, 型)]
 
 fn collect_controllers(files: &[(String, String)]) -> Sigs {
@@ -297,8 +444,10 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
     let routes = extract(files, &mut warn);
     let sigs = collect_controllers(files);
     let bodies = collect_bodies(files);
+    let schema = collect_schema(files);
     rep.extend(warn.iter().cloned());
     let mut used: Vec<String> = vec![];
+    let mut models: Vec<String> = vec![];
     let mut m = String::from("\"\"\"pl2pl php が生成した FastAPI の骨組み。ルートと型を写し、本体は TODO。\"\"\"\nfrom fastapi import FastAPI\n\napp = FastAPI()\n");
     let path_var = Regex::new(r"\{(\w+)\??\}").unwrap();
     for r in &routes {
@@ -326,7 +475,16 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
             params.push("payload: dict | None = None".into());
         }
         m.push_str(&format!("\n\n@app.{}({:?})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
-        let ctl_body = if r.body.is_none() { bodies.get(&(r.class.clone(), r.method.clone())).and_then(|b| simple_return(b)) } else { None };
+        let raw_body = bodies.get(&(r.class.clone(), r.method.clone()));
+        let mut ctl_body = if r.body.is_none() { raw_body.and_then(|b| simple_return(b)) } else { None };
+        if r.body.is_none() && ctl_body.is_none() {
+            if let Some((model, expr)) = raw_body.and_then(|b| eloquent_return(b)) {
+                if !models.contains(&model) {
+                    models.push(model);
+                }
+                ctl_body = Some(expr);
+            }
+        }
         match r.body.as_ref().or(ctl_body.as_ref()) {
             Some(b) => m.push_str(&format!("    return {b}\n")),
             None => {
@@ -335,13 +493,25 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
             }
         }
     }
+    if !models.is_empty() {
+        m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\n\nfrom models import {}\n", models.join(", ")), 1);
+    }
+    for mo in &models {
+        let n = schema.get(mo).map(|x| x.1.len()).unwrap_or(0);
+        rep.push(format!("Eloquent モデル {mo} → SQLAlchemy(db.py・models.py、列 {n} 個。マイグレーション/$fillable に無い項目は extra JSON へ)"));
+    }
     if routes.is_empty() {
         rep.push("ルートが見つかりませんでした(Laravel の `Route::`、Symfony の `#[Route]` が対象)".into());
     }
     let mut outf = vec![("main.py".to_string(), m), ("requirements.txt".to_string(), "fastapi\nuvicorn\n".to_string())];
+    if !models.is_empty() {
+        outf.push(("db.py".to_string(), DB_PY.to_string()));
+        outf.push(("models.py".to_string(), models_py(&models, &schema)));
+        outf[1].1 = "fastapi\nuvicorn\nsqlalchemy\n".to_string();
+    }
     if target == "mfastapi" {
         outf.push(("run_mfastapi.py".to_string(), "import mfastapi\nfrom main import app\n\nmfastapi.accelerate(app)\n\nif __name__ == \"__main__\":\n    import uvicorn\n    uvicorn.run(app, host=\"127.0.0.1\", port=8000)\n".to_string()));
-        outf[1].1 = "fastapi\nuvicorn\nmfastapi\n".to_string();
+        outf[1].1 = format!("{}mfastapi\n", outf[1].1);
     }
     rep.push(format!("ルート {} 本を FastAPI へ写しました(PHP の本体・ミドルウェア・Eloquent・Blade は未変換)", routes.len()));
     outf

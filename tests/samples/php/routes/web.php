@@ -10,3 +10,4 @@ Route::prefix('api')->group(function () {
 });
 Route::get('/health', [UserController::class, 'health']);
 Route::get('/echo/{id}', [UserController::class, 'echoId']);
+Route::delete('/users/{id}', [UserController::class, 'destroy']);
