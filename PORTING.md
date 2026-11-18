@@ -28,3 +28,5 @@
 **2026-11-18 追記**: PHP→FastAPI で、コントローラの単純な `return <値>` と `return $引数` を本体として変換(従来はTODO)。`tests/run-php.sh` に `/health`・`/echo/{id}` を追加し WSL で成功。複雑な本体(Eloquent等)は従来どおりTODO。 / PHP→FastAPI now translates simple controller `return` bodies (incl. returning path params); e2e extended and passing; complex bodies stay TODO.
 
 **2026-11-18 追記2**: Numba の実行を WSL で確認(元=9999900000.0、変換後=9999900000.0、同一結果。`tests/numba-check.sh`)。Kokkos は未確認のまま(ソースの取得が要るため許可待ち)。 / Numba verified in WSL (same result); Kokkos still unverified (needs a source download, awaiting permission).
+
+**2026-11-18 追記3**: Kokkos 4.5.01(Serial)を WSL でビルドし、変換結果が元と同一出力(sum=1249998750.000 a_last=999999.0)になることを確認(`tests/kokkos-check.sh`)。`Kokkos::ScopeGuard` は変換器が挿入しないため、試験側で足している(従来どおりレポートで指摘)。GPU/View は未確認。 / Kokkos (Serial) verified in WSL, same output; ScopeGuard is added by the test, not the converter; GPU/View unverified.
