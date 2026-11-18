@@ -1,12 +1,18 @@
-# pl2pl 引き継ぎ / Hand-off
-## 到達点 (2026-11-18) / Status
-**日本語**: 雛形(README・設計メモ・`docs/LANGUAGES.md`)のみ。コードなし。所有者が想定した変換元(HTML5〜aruaru-db の31項目)と、網羅した候補一覧を記録済み。最初に変換する言語は選定中。
-**English**: Skeleton only (README, design notes, `docs/LANGUAGES.md`); no code. The owner's proposed sources (31 items) and the exhaustive candidate list are recorded. The first language is still being chosen.
-## 未了 / Open
-1. 最初の言語の決定(案: PHP)。/ Choose the first language (suggestion: PHP).
-2. `docs/DESIGN.md` の各節(目的・IR・入出力・取り込み順)を所有者が書く。/ The owner fills in DESIGN.md.
-3. 共通IRの試作(COBOL_to・Java_to のコードから共通部分を抽出)。/ Prototype a shared IR from COBOL_to and Java_to.
-4. 一覧の最新性の検証(検索)。/ Verify the list is current.
+# pl2pl 引き継ぎ
+## 到達点(2026-11-18)
+v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
+PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
+## 未了(優先順)
+1. PHP: リレーション(`hasMany` / `belongsTo` / `belongsToMany`、`whereHas`、`with`)、`paginate`、`$request->query()`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
+3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
+4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
+5. Kokkos の GPU 実行・`Kokkos::View` への置き換え、open-cuda / open-directx 上のカーネル実行。
+6. `docs/DESIGN.md` の各節を所有者が書く。一覧(`docs/LANGUAGES.md`)の最新性の検証。
+7. CI(Linux arm64・macOS)での新サンプル(PHP の SQLAlchemy・Jinja2・ミドルウェア)の実行。
+## 再開用メッセージ
+「F:\pl2pl を再開。PORTING.md の未了の1から進める(まず PHP のリレーション)。変換できない箇所は黙って落とさず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は確認してから。」
+---
 ## 決定済み(訂正済み: WEB版は説明とダウンロードのみ、変換はPCアプリ。主要変換元=OSACCESS・ACCESS VBA・VB・VB.NET・VBA・C・C++・C#.NET・COBOL) / Decided (corrected: web = downloads and manuals only; conversion in the PC app)
 以下は訂正前の記述 / Text below predates the correction:
 日本語: 全部は網羅せず、選んだものだけ実装。WEB版はHDD上の変換器を要求ごとに呼び出す(常駐させない)。`docs/DESIGN.md` 参照。 / English: Not exhaustive; only chosen entries. The web version calls on-disk converters per request (not resident). See `docs/DESIGN.md`.

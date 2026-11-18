@@ -1,46 +1,55 @@
 # pl2pl
 
-**日本語**: プログラミング言語(programming language)から プログラミング言語へ、言語・フレームワークをまたいで変換する**統合ツール**の構想リポジトリです。
-設計・仕様は少しずつ書きます(`docs/DESIGN.md`)。現時点でコードはありません。
+プログラミング言語(programming language)から プログラミング言語へ、言語・フレームワーク・動作OSをまたいで変換する**統合ツール**です(v0.1.0 公開済み、開発中)。
+Windows(x64/ARM64)・Linux(amd64/arm64)・macOS(arm64/x64)用のインストーラーがあります。変換はインストール型のPCアプリ(CLI)で行い、WEB版は説明書とダウンロードだけです。
+設計・仕様は少しずつ書いています(`docs/DESIGN.md`)。変換は保守的に行い、**変換できない箇所は黙って落とさず `TODO` として残し、レポートに理由つきで出します**。
 
-**English**: A planning repository for one unified "programming language to programming language" converter across languages and frameworks.
-Design and specification will be written gradually (`docs/DESIGN.md`). There is no code yet.
-
-## 統合・融合の候補 / Candidates to merge or fuse
-| リポジトリ / Repo | 入力 → 出力 / Input → Output | 状態 / Status |
+## 統合・融合の候補
+| リポジトリ | 入力 → 出力 | 状態 |
 |---|---|---|
-| [COBOL_to](https://github.com/aon-co-jp/COBOL_to) | COBOL → FastAPI / MFastAPI / Poem / RPoem | 実装あり / implemented |
-| Java_to | Java (Spring, JAX-RS, Servlet, Spark…) → FastAPI / MFastAPI / Poem / RPoem | 開発中 / in progress |
+| [COBOL_to](https://github.com/aon-co-jp/COBOL_to) | COBOL → FastAPI / MFastAPI / Poem / RPoem | 実装あり(別セッションで開発中) |
+| [Java_to](https://github.com/aon-co-jp/Java_to) | Java(Spring・JAX-RS・Servlet・Spark など)→ FastAPI / MFastAPI / Poem / RPoem | 開発中 |
 | [2FastAPI](https://github.com/aon-co-jp/2FastAPI) / 2FastAPI-VSC | Flask / Django → FastAPI | 実装あり |
 | [2MFastAPI](https://github.com/aon-co-jp/2MFastAPI) | Flask / Django / FastAPI → MFastAPI | 実装あり |
 | [2Poem](https://github.com/aon-co-jp/2Poem) | Flask / Django / FastAPI → Poem / RPoem | 実装あり |
-| [MFastAPI](https://github.com/aon-co-jp/MFastAPI) / [RMojo](https://github.com/aon-co-jp/RMojo) / [RPoem](https://github.com/aon-co-jp/RPoem) | 変換先の実行基盤 / target runtimes | 実装あり |
+| [MFastAPI](https://github.com/aon-co-jp/MFastAPI) / [RMojo](https://github.com/aon-co-jp/RMojo) / [RPoem](https://github.com/aon-co-jp/RPoem) | 変換先の実行基盤 | 実装あり |
 
-共通点: 入力の自動判定 → ルート/型の抽出 → 4種の出力先(fastapi / mfastapi / rust-poem / rpoem) → 変換レポート(`*-REPORT.md`) → 手作業箇所は黙って落とさず `TODO` で残す。
-Common shape: detect input → extract routes/types → four targets → conversion report → never drop untranslatable code silently.
+共通の流れ: 入力の自動判定 → ルート・型の抽出 → 出力先(fastapi / mfastapi / rust-poem / rpoem)→ 変換レポート → 手作業が要る箇所は `TODO` で残す。
+COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリは削除する予定です(所有者の指示)。削除は元に戻せないため、取り込み後に改めて確認します。
 
-## 方針案 / Draft direction (未確定 / undecided)
-- 共通の中間表現(IR: ルート・型・関数本体)を作り、各 `X_to` を「入力側フロントエンド」、4種の出力を「バックエンド」として分ける(N×M を N+M に)。
+## 方針案(未確定)
+- 共通の中間表現(IR: ルート・型・関数本体)を作り、各 `X_to` を「入力側フロントエンド」、出力を「バックエンド」に分ける(N×M を N+M に)。
 - 既存リポジトリは当面そのまま残し、pl2pl が成熟してから取り込む(破壊的な統合はしない)。
+- 翻訳システム(AIによる自然言語の翻訳)は変換器と分ける。変換器は翻訳にも LLM にも依存しない。
 
-## 変換元の候補一覧 / Source candidates
-言語・フレームワーク・DB・画面側を網羅した一覧は[`docs/LANGUAGES.md`](docs/LANGUAGES.md)。最初に変換する言語は選定中(案: PHP、次点 Go / Kotlin、DBは別線で SQL 方言 → aruaru-db)。
-The full list (languages, frameworks, databases, UI) is in [`docs/LANGUAGES.md`](docs/LANGUAGES.md). The first language is still being chosen (suggestion: PHP; runners-up Go / Kotlin; databases as a separate line, SQL dialects → aruaru-db).
+## 変換元の候補一覧
+言語・フレームワーク・DB・画面側を網羅した一覧は[`docs/LANGUAGES.md`](docs/LANGUAGES.md)。組み合わせ表と優先フレームワークは[`docs/COMBINATIONS.md`](docs/COMBINATIONS.md)。
 
-組み合わせ表と優先フレームワークは[`docs/COMBINATIONS.md`](docs/COMBINATIONS.md)。 / OS combinations and priority frameworks: [`docs/COMBINATIONS.md`](docs/COMBINATIONS.md).
-
-## 実装済みのコマンド(2026-11-18、`src/`) / Implemented commands
+## 実装済みのコマンド(`src/`)
 | コマンド | 内容 | 検証 |
 |---|---|---|
 | `pl2pl cobol` | COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash。DD名→`DD_xxx`、非互換の検出 | GnuCOBOL で実際にビルド・実行(JCL 経由) |
 | `pl2pl omp` | C/C++ の独立ループへ `#pragma omp parallel for`(和の縮約つき) | 元のコードと同じ結果 |
-| `pl2pl php` | Laravel / Symfony のルート → FastAPI の骨組み(本体は TODO) | TestClient で実行 |
-| `pl2pl web` | Java / COBOL / Flask・Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け | 単体試験(振り分け計画) |
+| `pl2pl php` | Laravel / Symfony → FastAPI。詳細は下の「PHP 変換の対応範囲」 | 実 FastAPI・実 SQLite・実 Jinja2 で通し試験 |
+| `pl2pl web` | Java / COBOL / Flask・Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け | 実機(Java 7ファイル・COBOL 1ファイルを実際に変換、終了コード0) |
 | `pl2pl cport` | UNIX の C → 互換ヘッダー+機械置換+移植の指針(fork・socket 等は報告) | gcc でビルド・実行 |
-| `pl2pl pyhpc` | Python の数値関数へ Numba `@njit`、`--mpi` で mpi4py 雛形 | 単体試験(Numba 実行は確認中) |
-| `pl2pl kokkos` | 独立ループ → Kokkos(`parallel_for` / 和の `parallel_reduce`) | 出力のみ(Kokkos 未導入) |
-| `pl2pl gpu` | (試作)独立ループ → CUDA 形式 `.cu` / HLSL `.hlsl` | 出力のみ(open-cuda/open-directx 未実行) |
+| `pl2pl pyhpc` | Python の数値関数へ Numba `@njit`、`--mpi` で mpi4py 雛形 | Numba 実行で元と同一結果(`tests/numba-check.sh`) |
+| `pl2pl kokkos` | 独立ループ → Kokkos(`parallel_for` / 和の `parallel_reduce`) | Kokkos 4.5.01(Serial)で実ビルド、同一出力(`tests/kokkos-check.sh`) |
+| `pl2pl gpu` | (試作)独立ループ → CUDA 形式 `.cu` / HLSL `.hlsl` | 出力のみ(open-cuda / open-directx 上の実行は未確認) |
 | `pl2pl llm setup` / `llm start` | 同梱の aruaru-llm を起動し、空きメモリに合うモデル(Qwen2.5)を自動選択して導入 | 選択ロジックと --dry-run のみ(実導入は未確認) |
 | `pl2pl doctor` | open-cpu(内蔵)の CPU 情報 | 実行確認 |
-同梱コンポーネントは [`components/README.md`](components/README.md)。試験は `bash tests/run-all.sh`(WSL)。
-Implemented commands above; bundled components in `components/README.md`; tests via `bash tests/run-all.sh` (WSL).
+
+同梱コンポーネントは [`components/README.md`](components/README.md)。試験は `bash tests/run-all.sh`(WSL)、PHP の通し試験は `bash tests/run-php.sh`。
+
+## PHP 変換の対応範囲(`pl2pl php`)
+- **ルート**: Laravel の `Route::get/post/put/patch/delete/any/resource/apiResource/view`、`prefix` グループ、Symfony の `#[Route]`。
+- **本体**: クロージャとコントローラの単純な `return`、複数文(取得 → 更新・保存・削除 → 返却)、`response()->json($x, 201)`、`noContent()`。
+- **Eloquent → SQLAlchemy**: `db.py`・`models.py` を生成。列はマイグレーションの `Schema::create` か `$fillable` から取り、無い項目は `extra`(JSON)へ入れる。接続先は環境変数 `DATABASE_URL`(既定は SQLite)。
+- **クエリビルダ**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take` と、`get / first / firstOrFail / count / exists / delete`。`orWhere` は左から順に評価(Laravel の括弧グループとは異なる)。
+- **Blade → Jinja2**(`templates/`): 出力・`@if`・`@foreach`・`@forelse`・`@for`・`@extends/@section/@yield/@include` など。`view()`・`compact`・`->with`・`Route::view` は `TemplateResponse` へ。
+- **ミドルウェア → `Depends`**(`middleware.py`): `auth`(Bearer と環境変数 `API_TOKENS` の簡易判定。**本物の認証へ差し替えること**)、`guest`、`throttle:N,M`(メモリ上の簡易版)、独自ミドルウェアの「条件で拒否 → `return $next($request)`」の形。
+- **未対応(TODO として報告)**: リレーション(`whereHas` など)・`paginate`・`$request->query()`・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
+
+## 注意
+- 判定は保守的です。依存や副作用の恐れがあるものは**付けずに理由を報告**し、性能は保証しません。
+- 試験した範囲は小さな自作サンプルです。実際の大きなプログラムでは試していません。

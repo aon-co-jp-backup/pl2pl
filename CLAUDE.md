@@ -1,6 +1,6 @@
 # pl2pl 開発メモ / Dev notes
 **日本語**
-- 役割: COBOL_to・Java_to・2FastAPI・2MFastAPI・2Poem を共通の中間表現(IR)で統合・融合する構想リポジトリ。現時点でコードは無い。設計・仕様は所有者が少しずつ書く(`docs/DESIGN.md`)。勝手に仕様を決めて書き込まないこと。
+- 役割: COBOL_to・Java_to・2FastAPI・2MFastAPI・2Poem を共通の中間表現(IR)で統合・融合する構想リポジトリ。v0.1.0 公開済みで、コードがある(`src/`)。設計・仕様は所有者が少しずつ書く(`docs/DESIGN.md`)。勝手に仕様を決めて書き込まないこと。
 - 変換元の候補一覧は `docs/LANGUAGES.md`(知識ベース、最新性は未検証)。最初の言語は選定中(案: PHP)。
 - IR は3系統に分ける想定: ①サーバー側(ルート・型・本体)②DB/SQL ③画面側(出力は RPoem の Rust→WASM)。
 - 既存リポジトリは当面そのまま残す。破壊的な統合はしない。
@@ -29,3 +29,9 @@
 - 同梱の実態は `components/README.md`(open-cpu のみバイナリ内。open-cuda/open-directx は試作の出力先、aruaru-llm は未連携)。
 
 - 翻訳システム(AIによる自然言語の翻訳)は変換器と分ける。変換器は LLM に依存しない(`docs/DESIGN.md` 末尾) / The translation system is separate from the converters; converters do not depend on an LLM.
+
+## PHP 変換の実装メモ(2026-11-18)
+- `src/php.rs`(ルート・本体・Eloquent・クエリビルダ)、`src/blade.rs`(Blade → Jinja2)、`src/middleware.rs`(ミドルウェア → `Depends`)。変換できない文が1つでもあれば、その本体・テンプレートの該当箇所は TODO として残してレポートに出す。
+- 通し試験は `tests/run-php.sh`(実 FastAPI・実 SQLite・実 Jinja2)。WSL から PowerShell 経由で `wsl -d Ubuntu -- bash <スクリプト>` で動かす(Git Bash はパスを書き換え、`$PATH` も展開される)。
+- 日本語を含むファイルは Python に `-X utf8` を付けて書く(Windows の既定は cp932)。引用符が混ざる長い文字列はシェルの heredoc ではなく Write ツールでファイルにしてから使う。
+- COBOL_to・Java_to の取り込み後の削除は、所有者の指示だが元に戻せない。取り込み内容を確認してから、最終確認を取って行う。
