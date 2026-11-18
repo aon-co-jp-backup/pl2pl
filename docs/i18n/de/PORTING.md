@@ -4,7 +4,7 @@
 ## Stand der Dinge (2026-11-19)
 Version 0.1.0 ist veröffentlicht, mit Installern für Windows, Linux und macOS sowie Ende-zu-Ende-Tests in der CI. Die PHP-Umwandlung deckt Routen, Rümpfe mit mehreren Anweisungen, Eloquent (SQLAlchemy), den Query Builder mit Paginierung, Relationen (auch verschachteltes `with`), Blade (Jinja2) und Middleware (`Depends`) ab – alles Ende-zu-Ende getestet. Numba, Kokkos (Serial) und `pl2pl web` sind durch echte Läufe bestätigt.
 ## Offene Punkte nach Priorität
-1. PHP: `morph`, Blade-Komponenten/-Stacks/-Autorisierung, Middleware, die nach `$next` wirkt.
+1. PHP: `morph`, Blade-Komponenten/-Stacks/-Autorisierung, Middleware, die den Antworttext nach `$next` verändert.
 2. COBOL_to / Java_to in pl2pl aufnehmen und danach die Originale löschen (vorher bestätigen; nicht rückgängig zu machen; andere Sitzungen arbeiten daran).
 3. Prototyp der gemeinsamen Zwischendarstellung.
 4. Anbindung an aruaru-llm (eine echte Installation mit `llm setup` ist noch ungeprüft).

@@ -4,7 +4,7 @@
 ## 目前进展(2026-11-19)
 v0.1.0 已发布,提供 Windows、Linux、macOS 安装包,CI 中有端到端测试。PHP 转换已覆盖路由、多语句函数体、Eloquent(SQLAlchemy)、带分页的查询构造器、模型关联(含嵌套 `with`)、Blade(Jinja2)和中间件(`Depends`),均已做端到端测试。Numba、Kokkos(Serial)和 `pl2pl web` 都已实际运行确认。
 ## 待办事项(按优先级)
-1. PHP:`morph`、Blade 的组件/堆栈/授权、在 `$next` 之后起作用的中间件。
+1. PHP:`morph`、Blade 的组件/堆栈/授权、在 `$next` 之后修改正文的中间件。
 2. 把 COBOL_to / Java_to 并入 pl2pl,然后删除原仓库(须先确认;无法撤销;其他会话正在开发)。
 3. 制作统一中间表示的原型。
 4. 接入 aruaru-llm(`llm setup` 的真实安装尚未验证)。
