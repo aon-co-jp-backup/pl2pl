@@ -1,5 +1,8 @@
 # pl2pl
 
+**Languages**: 日本語(このファイル) / [English](docs/i18n/en/README.md) / [简体中文](docs/i18n/zh-CN/README.md) / [繁體中文](docs/i18n/zh-TW/README.md) / [한국어](docs/i18n/ko/README.md) / [Deutsch](docs/i18n/de/README.md) / [Français](docs/i18n/fr/README.md) / [Español](docs/i18n/es/README.md) / [Русский](docs/i18n/ru/README.md) / [Português](docs/i18n/pt/README.md)
+(AI翻訳。ネイティブ検証前。CLAUDE.md・PORTING.md も同じフォルダにあります)
+
 プログラミング言語(programming language)から プログラミング言語へ、言語・フレームワーク・動作OSをまたいで変換する**統合ツール**です(v0.1.0 公開済み、開発中)。
 Windows(x64/ARM64)・Linux(amd64/arm64)・macOS(arm64/x64)用のインストーラーがあります。変換はインストール型のPCアプリ(CLI)で行い、WEB版は説明書とダウンロードだけです。
 設計・仕様は少しずつ書いています(`docs/DESIGN.md`)。変換は保守的に行い、**変換できない箇所は黙って落とさず `TODO` として残し、レポートに理由つきで出します**。
@@ -50,6 +53,14 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 - **ミドルウェア → `Depends`**(`middleware.py`): `auth`(Bearer と環境変数 `API_TOKENS` の簡易判定。**本物の認証へ差し替えること**)、`guest`、`throttle:N,M`(メモリ上の簡易版)、独自ミドルウェアの「条件で拒否 → `return $next($request)`」の形。
 - **リレーション**: `hasMany` / `hasOne` / `belongsTo` / `belongsToMany`(中間表を自動生成)。`$u->posts`、`$p->user`、`$u->posts()->create([...])`、`attach / detach / sync`、`with('posts')`、`whereHas('posts', fn($q) => $q->where(...))`、`has('posts')`・`whereDoesntHave`・`doesntHave` に対応。外部キー列が無ければ追加する。
 - **未対応(TODO として報告)**: リレーションのネスト(`with('posts.comments')`)・`morph` 系・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
+
+## 完成予定の機能(未了)
+- PHP: ネストした `with('a.b')`、`morph` 系リレーション、`cursorPaginate`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+- COBOL_to・Java_to を、開発が進んだら pl2pl へ取り込み、元のリポジトリを削除(所有者の指示。削除は元に戻せないので取り込み後に再確認)。
+- 共通の中間表現(サーバー側・DB/SQL・画面側)。
+- aruaru-llm との連携(`llm setup` の実導入は未確認)。
+- Kokkos の GPU 実行・`Kokkos::View`、open-cuda / open-directx 上のカーネル実行。
+- CI(Linux arm64・macOS)での新サンプルの実行、`docs/LANGUAGES.md` から選んだ言語の組み合わせの追加(全組み合わせは作らない)。
 
 ## 注意
 - 判定は保守的です。依存や副作用の恐れがあるものは**付けずに理由を報告**し、性能は保証しません。

@@ -52,3 +52,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記10**: PHP の `paginate()`/`simplePaginate()`・`offset/skip`・`withQueryString`・`$request->query('k', 既定)` を変換。生成する `Query.paginate(n, request)` が `?page=N` を読み、Laravel と同じキー(`data/current_page/per_page/total/last_page/from/to/next_page_url/prev_page_url`)の `Page` を返す(Blade では繰り返し・`links()`・`->total()` が使える。`links()` は簡易なナビで Laravel の見た目とは異なる)。実SQLiteの通し試験(ページ送り・範囲外・不正な page・`links()`・`offset`・`query`)成功、単体テスト30件成功。未対応: `cursorPaginate`・ネストした `with`・`morph` 系。
 
 **2026-11-19 追記11**: PHP の `whereDoesntHave`/`doesntHave` を変換(`where_has` に否定フラグ)。実SQLiteの通し試験成功。未対応: ネストした `with`・`morph` 系・`cursorPaginate`。
+
+**2026-11-19 追記12**: README・CLAUDE・PORTING を日本語+9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt、`docs/i18n/`)に展開。今できている部分と完成予定の機能を記載。AI翻訳でネイティブ検証前。原本(日本語)を更新したら各言語も追従させる。
