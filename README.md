@@ -18,7 +18,7 @@ Windows(x64/ARM64)・Linux(amd64/arm64)・macOS(arm64/x64)用のインストー�
 | [MFastAPI](https://github.com/aon-co-jp/MFastAPI) / [RMojo](https://github.com/aon-co-jp/RMojo) / [RPoem](https://github.com/aon-co-jp/RPoem) | 変換先の実行基盤 | 実装あり |
 
 共通の流れ: 入力の自動判定 → ルート・型の抽出 → 出力先(fastapi / mfastapi / rust-poem / rpoem)→ 変換レポート → 手作業が要る箇所は `TODO` で残す。
-COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリは削除する予定です(所有者の指示)。削除は元に戻せないため、取り込み後に改めて確認します。
+COBOL_to・Java_to は `converters/` に取り込み済み(2026-11-19、履歴つき)です。元のリポジトリは、所有者の指示で最終的に削除する予定ですが、削除は元に戻せないため事前に確認します(まだ削除していません)。
 
 ## 方針案(未確定)
 - 共通の中間表現(IR: ルート・型・関数本体)を作り、各 `X_to` を「入力側フロントエンド」、出力を「バックエンド」に分ける(N×M を N+M に)。
@@ -58,7 +58,7 @@ CI(`.github/workflows/test.yml`)が push ごとに単体テストと PHP の通�
 
 ## 完成予定の機能(未了)
 - PHP: `@can` 系の認可とクラスベースの Blade コンポーネント。
-- COBOL_to・Java_to を、開発が進んだら pl2pl へ取り込み、元のリポジトリを削除(所有者の指示。削除は元に戻せないので取り込み後に再確認)。
+- COBOL_to・Java_to は `converters/` に取り込み済み(履歴つきのスナップショット、cobol_to 10件・java_to 15件のテストが通る)。残り: `pl2pl web` を同梱コピーへ切り替える、元リポジトリのその後の変更を取り込む、元リポジトリの削除(所有者の指示。削除は元に戻せないので事前に確認)。
 - 共通の中間表現(サーバー側・DB/SQL・画面側)。
 - aruaru-llm との連携(`llm setup` の実導入は未確認)。
 - Kokkos の GPU 実行・`Kokkos::View`、open-cuda / open-directx 上のカーネル実行。

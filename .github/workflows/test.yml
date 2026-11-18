@@ -23,6 +23,8 @@ jobs:
         run: |
           cargo build --release
           cargo test --release
+          cargo test --release --manifest-path converters/cobol_to/Cargo.toml
+          cargo test --release --manifest-path converters/java_to/Cargo.toml
       - name: PHP 通し試験の Python 環境
         run: |
           python3 -m venv "$HOME/2fa-venv"

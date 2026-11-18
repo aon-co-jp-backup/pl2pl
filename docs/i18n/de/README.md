@@ -29,7 +29,7 @@ Der Konverter geht bewusst vorsichtig vor. **Was sich nicht umwandeln lässt, wi
 
 ## Geplant (noch nicht umgesetzt)
 - PHP: `@can`-artige Autorisierung und klassenbasierte Blade-Komponenten (anonyme `<x-...>`-Komponenten funktionieren bereits) sowie Middleware, die den Antworttext nach `$next` verändert (Header hinzufügen funktioniert bereits).
-- COBOL_to und Java_to in pl2pl aufnehmen, sobald sie ausgereift sind, und die ursprünglichen Repositorys löschen. Das ist die Vorgabe des Eigentümers; da sich das Löschen nicht rückgängig machen lässt, wird es nach der Übernahme noch einmal bestätigt.
+- COBOL_to und Java_to liegen jetzt in `converters/` (Momentaufnahme samt Verlauf, Tests laufen durch). Noch offen: `pl2pl web` auf die mitgelieferten Kopien umstellen, spätere Änderungen aus den Originalen nachziehen und danach die ursprünglichen Repositorys löschen (Vorgabe des Eigentümers; das Löschen lässt sich nicht rückgängig machen und wird vorher bestätigt).
 - Eine gemeinsame Zwischendarstellung (Serverseite, Datenbank/SQL, Oberfläche), damit N Quellen und M Ziele nur N+M statt N×M Bausteine brauchen.
 - Anbindung an aruaru-llm. Erklärungen und die Übersetzung natürlicher Sprache bleiben vom Konverter getrennt; der Konverter selbst hängt nie von einem LLM ab.
 - Kokkos auf der GPU und `Kokkos::View` sowie die Ausführung von Kernels auf open-cuda / open-directx.

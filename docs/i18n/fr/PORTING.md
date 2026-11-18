@@ -5,7 +5,7 @@
 La version 0.1.0 est publiée, avec des installateurs pour Windows, Linux et macOS et des tests de bout en bout en CI. La conversion PHP couvre les routes, les corps à plusieurs instructions, Eloquent (SQLAlchemy), le query builder avec pagination, les relations (y compris `with` imbriqué), Blade (Jinja2) et les middlewares (`Depends`), le tout testé de bout en bout. Numba, Kokkos (Serial) et `pl2pl web` ont été confirmés par de vraies exécutions.
 ## Points ouverts, par ordre de priorité
 1. PHP : autorisation `@can` et composants Blade à base de classes, middleware modifiant le corps après `$next`.
-2. Intégrer COBOL_to / Java_to à pl2pl, puis supprimer les originaux (confirmer d'abord ; irréversible ; d'autres sessions y travaillent).
+2. Faire pointer `pl2pl web` vers les copies de `converters/`, rattraper les changements ultérieurs de COBOL_to / Java_to, puis supprimer les originaux (confirmer d'abord ; irréversible ; une autre session y travaille peut-être encore).
 3. Prototype de la représentation intermédiaire commune.
 4. Intégration d'aruaru-llm (une vraie installation par `llm setup` reste à vérifier).
 5. Kokkos sur GPU / `Kokkos::View` ; noyaux sur open-cuda / open-directx.

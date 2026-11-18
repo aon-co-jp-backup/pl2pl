@@ -29,7 +29,7 @@ O conversor é cauteloso de propósito. **O que ele não consegue converter nunc
 
 ## Planejado (ainda não feito)
 - PHP: autorização no estilo `@can` e componentes do Blade baseados em classe (os componentes anônimos `<x-...>` já funcionam), e middleware que altera o corpo da resposta depois de `$next` (adicionar cabeçalhos já funciona).
-- Incorporar COBOL_to e Java_to ao pl2pl quando estiverem maduros e apagar os repositórios originais. É uma orientação do proprietário; como apagar não tem volta, será confirmado de novo depois da incorporação.
+- COBOL_to e Java_to já estão em `converters/` (instantâneo com histórico, os testes passam). Falta: fazer o `pl2pl web` usar as cópias incluídas, acompanhar as mudanças feitas nos originais e, depois, apagar os repositórios originais (orientação do proprietário; apagar não tem volta, então será confirmado antes).
 - Uma representação intermediária comum (lado do servidor, banco de dados/SQL, interface) para que N origens e M destinos precisem de N+M peças em vez de N×M.
 - Integração com o aruaru-llm. Explicações e tradução de linguagem natural continuam separadas dos conversores, que nunca dependem de um LLM.
 - Kokkos em GPU e `Kokkos::View`, além de executar kernels em open-cuda / open-directx.

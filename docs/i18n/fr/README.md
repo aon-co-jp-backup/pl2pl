@@ -29,7 +29,7 @@ Le convertisseur est volontairement prudent. **Ce qu'il ne sait pas convertir n'
 
 ## À venir (pas encore fait)
 - PHP : autorisation de type `@can` et composants Blade à base de classes (les composants anonymes `<x-...>` fonctionnent déjà), et middleware qui modifie le corps de la réponse après `$next` (l'ajout d'en-têtes fonctionne déjà).
-- Intégrer COBOL_to et Java_to à pl2pl une fois qu'ils seront matures, puis supprimer les dépôts d'origine. C'est la consigne du propriétaire ; comme une suppression est irréversible, elle sera reconfirmée après l'intégration.
+- COBOL_to et Java_to se trouvent désormais dans `converters/` (instantané avec historique, les tests passent). Reste à faire : faire pointer `pl2pl web` vers les copies intégrées, rattraper les changements faits dans les originaux, puis supprimer les dépôts d'origine (consigne du propriétaire ; une suppression est irréversible, elle sera donc confirmée avant).
 - Une représentation intermédiaire commune (côté serveur, base de données/SQL, interface), pour que N sources et M cibles demandent N+M composants au lieu de N×M.
 - Intégration d'aruaru-llm. Les explications et la traduction en langue naturelle restent séparées des convertisseurs, qui ne dépendent jamais d'un LLM.
 - Kokkos sur GPU et `Kokkos::View`, ainsi que l'exécution de noyaux sur open-cuda / open-directx.
