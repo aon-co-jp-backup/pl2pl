@@ -26,3 +26,5 @@
 **2026-11-18 追記**: `v0.1.0` を公開。Windows x64/ARM64 exe・Linux amd64/arm64 deb+tar.gz・macOS arm64/x64 pkg(未署名)を CI が作り、インストール→実行→削除の試験が全て成功(Linux 側は COBOL+JCL 実行・OpenMP 同一結果・cport・PHP→FastAPI の通し試験も成功)。 / `v0.1.0` released; all OS installers built and smoke-tested in CI.
 
 **2026-11-18 追記**: PHP→FastAPI で、コントローラの単純な `return <値>` と `return $引数` を本体として変換(従来はTODO)。`tests/run-php.sh` に `/health`・`/echo/{id}` を追加し WSL で成功。複雑な本体(Eloquent等)は従来どおりTODO。 / PHP→FastAPI now translates simple controller `return` bodies (incl. returning path params); e2e extended and passing; complex bodies stay TODO.
+
+**2026-11-18 追記2**: Numba の実行を WSL で確認(元=9999900000.0、変換後=9999900000.0、同一結果。`tests/numba-check.sh`)。Kokkos は未確認のまま(ソースの取得が要るため許可待ち)。 / Numba verified in WSL (same result); Kokkos still unverified (needs a source download, awaiting permission).
