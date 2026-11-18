@@ -3,7 +3,7 @@
 v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
 PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
-1. PHP: リレーションの残り(ネストした `with`・`morph` 系)、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+1. PHP: リレーションの残り(`morph` 系)、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
 2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
@@ -54,3 +54,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記11**: PHP の `whereDoesntHave`/`doesntHave` を変換(`where_has` に否定フラグ)。実SQLiteの通し試験成功。未対応: ネストした `with`・`morph` 系・`cursorPaginate`。
 
 **2026-11-19 追記12**: README・CLAUDE・PORTING を日本語+9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt、`docs/i18n/`)に展開。今できている部分と完成予定の機能を記載。AI翻訳でネイティブ検証前。原本(日本語)を更新したら各言語も追従させる。
+
+**2026-11-19 追記13**: PHP のネストした `with('posts.comments')` を変換(モデルに `REL_CLASS` を生成し、`_load` が再帰的に読み込む)。実SQLiteの通し試験成功。未対応: `morph` 系・`cursorPaginate`。

@@ -51,11 +51,11 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 - **クエリビルダ**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip` と、`paginate / simplePaginate`(`?page=N`、Laravel と同じ JSON の形、Blade の `$users->links()`・`->total()`)、`$request->query('k', 既定値)` と、`get / first / firstOrFail / count / exists / delete`。`orWhere` は左から順に評価(Laravel の括弧グループとは異なる)。
 - **Blade → Jinja2**(`templates/`): 出力・`@if`・`@foreach`・`@forelse`・`@for`・`@extends/@section/@yield/@include` など。`view()`・`compact`・`->with`・`Route::view` は `TemplateResponse` へ。
 - **ミドルウェア → `Depends`**(`middleware.py`): `auth`(Bearer と環境変数 `API_TOKENS` の簡易判定。**本物の認証へ差し替えること**)、`guest`、`throttle:N,M`(メモリ上の簡易版)、独自ミドルウェアの「条件で拒否 → `return $next($request)`」の形。
-- **リレーション**: `hasMany` / `hasOne` / `belongsTo` / `belongsToMany`(中間表を自動生成)。`$u->posts`、`$p->user`、`$u->posts()->create([...])`、`attach / detach / sync`、`with('posts')`、`whereHas('posts', fn($q) => $q->where(...))`、`has('posts')`・`whereDoesntHave`・`doesntHave` に対応。外部キー列が無ければ追加する。
+- **リレーション**: `hasMany` / `hasOne` / `belongsTo` / `belongsToMany`(中間表を自動生成)。`$u->posts`、`$p->user`、`$u->posts()->create([...])`、`attach / detach / sync`、`with('posts')`(`with('posts.comments')` のネストも可)、`whereHas('posts', fn($q) => $q->where(...))`、`has('posts')`・`whereDoesntHave`・`doesntHave` に対応。外部キー列が無ければ追加する。
 - **未対応(TODO として報告)**: リレーションのネスト(`with('posts.comments')`)・`morph` 系・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
 
 ## 完成予定の機能(未了)
-- PHP: ネストした `with('a.b')`、`morph` 系リレーション、`cursorPaginate`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+- PHP: `morph` 系リレーション、`cursorPaginate`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
 - COBOL_to・Java_to を、開発が進んだら pl2pl へ取り込み、元のリポジトリを削除(所有者の指示。削除は元に戻せないので取り込み後に再確認)。
 - 共通の中間表現(サーバー側・DB/SQL・画面側)。
 - aruaru-llm との連携(`llm setup` の実導入は未確認)。

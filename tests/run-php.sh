@@ -74,6 +74,11 @@ assert uid not in [x["id"] for x in c.get("/unpublished").json()]
 lone = c.post("/users", json={"name": "lone", "age": 1}).json()["id"]
 assert lone in [x["id"] for x in c.get("/unpublished").json()]
 assert lone in [x["id"] for x in c.get("/no-posts").json()] and uid not in [x["id"] for x in c.get("/no-posts").json()]
+cm = c.post(f"/posts/{p1.json()['id']}/comments", json={"body": "hi"})
+assert cm.status_code == 200 and cm.json()["post_id"] == p1.json()["id"], cm.text
+dp = [x for x in c.get("/deep").json() if x["id"] == uid][0]
+assert [cc["body"] for cc in [q for q in dp["posts"] if q["id"] == p1.json()["id"]][0]["comments"]] == ["hi"], dp
+assert [q for q in dp["posts"] if q["title"] == "t2"][0]["comments"] == [], dp
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg

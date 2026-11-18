@@ -812,6 +812,18 @@ def _py_match(row, col, op, val):
         return False
 
 
+def _load(cls, rows, parts):
+    """with('a.b') の読み込み。a を各行へ付け、その子に対して b を再帰的に付ける。"""
+    rel, rest = parts[0], parts[1:]
+    for r in rows:
+        if rel not in r:
+            r[rel] = getattr(cls, rel)(r)
+    if rest:
+        sub = globals()[getattr(cls, "REL_CLASS", {})[rel]]
+        kids = [k for r in rows for k in ([r[rel]] if isinstance(r[rel], dict) else (r[rel] or []))]
+        _load(sub, kids, rest)
+
+
 class Page(dict):
     """paginate() の結果。JSON にすると Laravel と同じ形、テンプレートでは繰り返せて links() も使える。"""
 
@@ -880,9 +892,8 @@ class Query:
         return self
 
     def _decorate(self, rows):
-        for rel in self._with:
-            for r in rows:
-                r[rel] = getattr(self.cls, rel)(r)
+        for path in self._with:
+            _load(self.cls, rows, path.split("."))
         return rows
 
     def where(self, col, op, val=None):
@@ -1022,7 +1033,13 @@ fn models_py(models: &[String], schema: &Schema, rels: &Rels) -> String {
         let (t, cols) = schema.get(m).cloned().unwrap_or_else(|| (guess_table(m), vec![]));
         let cs: String = cols.iter().map(|(n, ty)| format!("    {n} = Column({ty})\n")).collect();
         let names: String = cols.iter().map(|(n, _)| format!("{n:?}, ")).collect();
-        let relcode: String = rels.get(m).into_iter().flatten().map(rel_methods).collect();
+        let mut relcode: String = rels.get(m).into_iter().flatten().map(rel_methods).collect();
+        if let Some(rs) = rels.get(m).filter(|v| !v.is_empty()) {
+            let pairs: Vec<String> = rs.iter().map(|r| format!("{:?}: {:?}", r.name, r.related)).collect();
+            relcode.push_str(&format!("
+    REL_CLASS = {{{}}}
+", pairs.join(", ")));
+        }
         o.push_str(&MODEL_PY.replace("__RELS__", &relcode).replace("__M__", m).replace("__T__", &t).replace("__COLS__", &cs).replace("__NAMES__", &names));
     }
     o.push_str("\n\nBase.metadata.create_all(engine)\n");

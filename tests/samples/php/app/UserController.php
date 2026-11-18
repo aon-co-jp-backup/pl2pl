@@ -98,4 +98,11 @@ class UserController {
     public function noPosts() {
         return User::doesntHave('posts')->get();
     }
+    public function deep() {
+        return User::with('posts.comments')->get();
+    }
+    public function addComment(Request $request, $id) {
+        $post = Post::findOrFail($id);
+        return $post->comments()->create($request->all());
+    }
 }
