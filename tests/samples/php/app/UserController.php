@@ -25,4 +25,21 @@ class UserController {
         $user = User::create($request->all());
         return response()->json($user, 201);
     }
+    public function adults() {
+        return User::where('age', '>=', 18)->orderBy('name')->get();
+    }
+    public function named(Request $request) {
+        $user = User::where('name', 'bob')->first();
+        return $user;
+    }
+    public function many() {
+        return User::where('age', '<', 18)->orWhere('name', 'zed')->latest()->limit(2)->get();
+    }
+    public function total() {
+        $n = User::where('age', '>', 0)->count();
+        return response()->json(['n' => $n]);
+    }
+    public function tagged() {
+        return User::where('tag', 'vip')->get();
+    }
 }

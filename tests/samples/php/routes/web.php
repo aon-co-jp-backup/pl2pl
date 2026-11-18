@@ -15,3 +15,8 @@ Route::put('/users/{id}', [UserController::class, 'update']);
 Route::post('/users/{id}/rename', [UserController::class, 'rename']);
 Route::delete('/users/{id}/remove', [UserController::class, 'remove']);
 Route::post('/make', [UserController::class, 'make']);
+Route::get('/adults', [UserController::class, 'adults']);
+Route::get('/named', [UserController::class, 'named']);
+Route::get('/many', [UserController::class, 'many']);
+Route::get('/total', [UserController::class, 'total']);
+Route::get('/tagged', [UserController::class, 'tagged']);

@@ -27,6 +27,13 @@ assert c.get(f"/users/{mid}").json()["tag"] == "t"
 assert c.delete(f"/users/{mid}/remove").status_code == 204
 assert c.get(f"/users/{mid}").json() is None
 assert c.put("/users/9999", json={}).status_code == 404
+for n, a, t in [("bob", 30, None), ("amy", 20, "vip"), ("kid", 5, None), ("zed", 2, "vip")]:
+    c.post("/users", json={"name": n, "age": a, **({"tag": t} if t else {})})
+assert [u["name"] for u in c.get("/adults").json()] == ["amy", "bob"], c.get("/adults").text
+assert c.get("/named").json()["age"] == 30
+assert [u["name"] for u in c.get("/many").json()] == ["zed", "kid"], c.get("/many").text
+assert c.get("/total").json()["n"] >= 4
+assert sorted(u["name"] for u in c.get("/tagged").json()) == ["amy", "zed"]
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 print("php e2e OK", len(paths))

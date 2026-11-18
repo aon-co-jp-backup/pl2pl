@@ -219,6 +219,24 @@ fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool
         if returned {
             return None; // return の後に文がある
         }
+        if let Some(c) = Regex::new(r"^\$(\w+)\s*=\s*(.+)$").unwrap().captures(&st) {
+            if let Some((model, py, one)) = query_expr(&c[2]) {
+                add_model(&model, models);
+                if one {
+                    vars.insert(c[1].to_string(), model);
+                }
+                lines.push(format!("{} = {}", &c[1], py));
+                continue;
+            }
+        }
+        if let Some(r) = st.strip_prefix("return") {
+            if let Some((model, py, _)) = query_expr(r) {
+                add_model(&model, models);
+                lines.push(format!("return {py}"));
+                returned = true;
+                continue;
+            }
+        }
         if let Some(c) = Regex::new(r"^\$(\w+)\s*=\s*(\w+)::(find|findOrFail|create)\((.*)\)$").unwrap().captures(&st) {
             let op = if &c[3] == "findOrFail" { "find_or_fail" } else { &c[3] };
             let a = arg_expr(&c[4])?;
@@ -264,6 +282,119 @@ fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool
         }
     }
     if returned { Some(lines) } else { None }
+}
+
+/// `a->b(x)->c(y)` をトップレベルの `->` で分ける(文字列・括弧の中は分けない)。
+fn split_chain(s: &str) -> Vec<String> {
+    let (mut v, mut cur, mut depth, mut q) = (vec![], String::new(), 0i32, None::<char>);
+    let cs: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < cs.len() {
+        let ch = cs[i];
+        if let Some(qc) = q {
+            cur.push(ch);
+            if ch == qc {
+                q = None;
+            }
+            i += 1;
+            continue;
+        }
+        match ch {
+            '\'' | '"' => {
+                q = Some(ch);
+                cur.push(ch);
+            }
+            '(' | '[' | '{' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            ')' | ']' | '}' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            '-' if depth == 0 && cs.get(i + 1) == Some(&'>') => {
+                v.push(cur.trim().to_string());
+                cur.clear();
+                i += 1;
+            }
+            _ => cur.push(ch),
+        }
+        i += 1;
+    }
+    v.push(cur.trim().to_string());
+    v
+}
+
+/// Eloquent のクエリビルダ(`Model::where(..)->orderBy(..)->get()` など)→ `Model.query().where(..).get()`。
+/// 戻り値は (モデル名, Python 式, 1行(辞書)を返すか)。
+fn query_expr(expr: &str) -> Option<(String, String, bool)> {
+    let e = expr.trim().trim_end_matches(';').trim();
+    let head = Regex::new(r"^(\w+)::(.*)$").unwrap().captures(e)?;
+    let model = head[1].to_string();
+    let chain = split_chain(&head[2]);
+    let call = Regex::new(r"^(\w+)\((.*)\)$").unwrap();
+    let mut py = format!("{model}.query()");
+    let mut terminal = false;
+    let mut one = false;
+    let mut first = true;
+    for seg in chain {
+        let c = call.captures(&seg)?;
+        let (name, raw) = (c[1].to_string(), c[2].to_string());
+        let args: Vec<String> = if raw.trim().is_empty() { vec![] } else { split_args(&raw) };
+        let a: Option<Vec<String>> = args.iter().map(|x| arg_expr(x)).collect();
+        let a = a?;
+        if terminal {
+            return None; // 終端(get/first/...)の後に続きがある
+        }
+        let m = match (name.as_str(), a.len()) {
+            ("query", 0) if first => continue,
+            ("where", 2) => format!(".where({}, \"=\", {})", a[0], a[1]),
+            ("where", 3) => format!(".where({}, {}, {})", a[0], a[1], a[2]),
+            ("orWhere", 2) => format!(".or_where({}, \"=\", {})", a[0], a[1]),
+            ("orWhere", 3) => format!(".or_where({}, {}, {})", a[0], a[1], a[2]),
+            ("whereIn", 2) => format!(".where({}, \"in\", {})", a[0], a[1]),
+            ("orderBy", 1) => format!(".order_by({}, \"asc\")", a[0]),
+            ("orderBy", 2) => format!(".order_by({}, {})", a[0], a[1]),
+            ("latest", 0) => ".order_by(\"id\", \"desc\")".to_string(),
+            ("latest", 1) => format!(".order_by({}, \"desc\")", a[0]),
+            ("oldest", 0) => ".order_by(\"id\", \"asc\")".to_string(),
+            ("oldest", 1) => format!(".order_by({}, \"asc\")", a[0]),
+            ("limit", 1) | ("take", 1) => format!(".limit({})", a[0]),
+            ("get", 0) | ("all", 0) => {
+                terminal = true;
+                ".get()".to_string()
+            }
+            ("first", 0) => {
+                terminal = true;
+                one = true;
+                ".first()".to_string()
+            }
+            ("firstOrFail", 0) => {
+                terminal = true;
+                one = true;
+                ".first_or_fail()".to_string()
+            }
+            ("count", 0) => {
+                terminal = true;
+                ".count()".to_string()
+            }
+            ("exists", 0) => {
+                terminal = true;
+                ".exists()".to_string()
+            }
+            ("delete", 0) => {
+                terminal = true;
+                ".delete()".to_string()
+            }
+            _ => return None,
+        };
+        first = false;
+        py.push_str(&m);
+    }
+    if !terminal {
+        return None;
+    }
+    Some((model, py, one))
 }
 
 type Schema = HashMap<String, (String, Vec<(String, &'static str)>)>; // モデル → (テーブル, 列)
@@ -354,6 +485,10 @@ __COLS__    extra = Column(JSON, default=dict)
         return d
 
     @classmethod
+    def query(cls):
+        return Query(cls)
+
+    @classmethod
     def all(cls):
         with Session() as s:
             return [r.to_dict() for r in s.query(cls).order_by(cls.id)]
@@ -406,8 +541,120 @@ __COLS__    extra = Column(JSON, default=dict)
             return row.to_dict()
 "##;
 
+const QUERY_PY: &str = r##"
+
+import operator as _op
+import re as _re
+
+_OPS = {"=": _op.eq, "==": _op.eq, "!=": _op.ne, "<>": _op.ne, "<": _op.lt, "<=": _op.le, ">": _op.gt, ">=": _op.ge}
+
+
+def _py_match(row, col, op, val):
+    v = row.get(col)
+    if op == "in":
+        return v in val
+    if op == "like":
+        pat = "^" + _re.escape(val).replace("%", ".*").replace("_", ".") + "$"
+        return v is not None and _re.match(pat, str(v), _re.I) is not None
+    try:
+        return _OPS[op](v, val)
+    except TypeError:
+        return False
+
+
+class Query:
+    """Eloquent のクエリビルダの代わり。列(マイグレーション/$fillable)は SQL、extra の項目や or_where は Python 側で絞る。"""
+
+    def __init__(self, cls):
+        self.cls = cls
+        self.conds = []
+        self.orders = []
+        self._limit = None
+
+    def where(self, col, op, val=None):
+        self.conds.append(("and", col, op, val))
+        return self
+
+    def or_where(self, col, op, val=None):
+        self.conds.append(("or", col, op, val))
+        return self
+
+    def order_by(self, col, direction="asc"):
+        self.orders.append((col, str(direction).lower() == "desc"))
+        return self
+
+    def limit(self, n):
+        self._limit = int(n)
+        return self
+
+    def _real(self, col):
+        return col == "id" or col in self.cls.COLUMNS
+
+    def get(self):
+        c = self.cls
+        use_sql = all(k == "and" and self._real(col) for k, col, _, _ in self.conds) and all(self._real(col) for col, _ in self.orders)
+        with Session() as s:
+            q = s.query(c)
+            if use_sql:
+                for _, col, op, val in self.conds:
+                    a = getattr(c, col)
+                    if op == "in":
+                        q = q.filter(a.in_(val))
+                    elif op == "like":
+                        q = q.filter(a.like(val))
+                    else:
+                        q = q.filter(_OPS[op](a, val))
+                for col, desc in self.orders:
+                    q = q.order_by(getattr(c, col).desc() if desc else getattr(c, col))
+                if not self.orders:
+                    q = q.order_by(c.id)
+                if self._limit is not None:
+                    q = q.limit(self._limit)
+                return [r.to_dict() for r in q]
+            rows = [r.to_dict() for r in q.order_by(c.id)]
+        if self.conds:
+            def keep(row):
+                res = None
+                for k, col, op, val in self.conds:
+                    m = _py_match(row, col, op, val)
+                    res = m if res is None else ((res or m) if k == "or" else (res and m))
+                return res
+            rows = [r for r in rows if keep(r)]
+        for col, desc in reversed(self.orders):
+            rows.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
+        return rows[: self._limit] if self._limit is not None else rows
+
+    def first(self):
+        saved, self._limit = self._limit, 1
+        rows = self.get()
+        self._limit = saved
+        return rows[0] if rows else None
+
+    def first_or_fail(self):
+        r = self.first()
+        if r is None:
+            raise HTTPException(status_code=404, detail="not found")
+        return r
+
+    def count(self):
+        saved, self._limit = self._limit, None
+        n = len(self.get())
+        self._limit = saved
+        return n
+
+    def exists(self):
+        return self.first() is not None
+
+    def delete(self):
+        n = 0
+        for r in self.get():
+            n += self.cls.destroy(r["id"])
+        return n
+"##;
+
 fn models_py(models: &[String], schema: &Schema) -> String {
     let mut o = String::from("\"\"\"pl2pl が生成したモデル(SQLAlchemy)。\"\"\"\nfrom fastapi import HTTPException\nfrom sqlalchemy import JSON, Boolean, Column, Float, Integer, String, Text\n\nfrom db import Base, Session, engine\n");
+    o.push_str(QUERY_PY);
     for m in models {
         let (t, cols) = schema.get(m).cloned().unwrap_or_else(|| (guess_table(m), vec![]));
         let cs: String = cols.iter().map(|(n, ty)| format!("    {n} = Column({ty})\n")).collect();
@@ -705,5 +952,16 @@ mod tests {
         assert_eq!(l, vec!["u = User.find_or_fail(id)", "u = User.update(u[\"id\"], (payload or {}))", "return u"]);
         assert_eq!(m, vec!["User"]);
         assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r).is_none());
+    }
+
+    #[test]
+    fn query_builder_chain() {
+        let (m, py, one) = query_expr("User::where('age', '>=', 18)->orderBy('name', 'desc')->limit(5)->get()").unwrap();
+        assert_eq!(m, "User");
+        assert_eq!(py, "User.query().where(\"age\", \">=\", 18).order_by(\"name\", \"desc\").limit(5).get()");
+        assert!(!one);
+        assert!(query_expr("User::where('a', 1)->first()").unwrap().2);
+        assert!(query_expr("User::where('a', 1)").is_none()); // 終端なし
+        assert!(query_expr("User::where('a', 1)->whereHas('x')->get()").is_none()); // 未対応は TODO のまま
     }
 }
