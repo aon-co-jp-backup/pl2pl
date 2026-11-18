@@ -46,4 +46,5 @@ Route::get('/no-posts', [UserController::class, 'noPosts']);
 Route::get('/deep', [UserController::class, 'deep']);
 Route::post('/posts/{id}/comments', [UserController::class, 'addComment']);
 Route::get('/cursored', [UserController::class, 'cursored']);
+Route::get('/extras', [UserController::class, 'extras']);
 Route::post('/roles', function (Request $request) { return Role::create($request->all()); });

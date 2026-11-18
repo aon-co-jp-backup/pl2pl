@@ -92,6 +92,12 @@ while True:
     cur = c.get(cur["next_page_url"]).json()
 assert seen == sorted(set(seen)) and len(seen) >= 3, seen
 assert c.get("/cursored?cursor=garbage").json()["data"][0]["id"] == cu1["data"][0]["id"]
+ex = c.get("/extras")
+assert ex.status_code == 200 and "<b>two</b>" in ex.text and "<b>one</b>" not in ex.text, ex.text
+assert "<i>out</i>" in ex.text and "<i>in</i>" not in ex.text and "checked" in ex.text, ex.text
+assert '<script src="/x.js"></script>' in ex.text and ex.text.index("/x.js") > ex.text.index("n=2"), ex.text
+assert "var d = {&#34;a&#34;: 1}" in ex.text or 'var d = {"a": 1}' in ex.text or "var d = {" in ex.text, ex.text
+assert "<i>in</i>" in c.get("/extras", headers={"Authorization": "Bearer z"}).text
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg

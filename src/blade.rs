@@ -236,10 +236,11 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
     }
     // 2) ディレクティブ
     let known = Regex::new(r"@(\w+)").unwrap();
-    let todo_names = ["php", "endphp", "auth", "endauth", "guest", "endguest", "can", "endcan", "cannot", "endcannot", "push", "endpush", "stack", "once", "endonce", "props", "component", "endcomponent", "slot", "endslot", "livewire", "lang", "error", "enderror", "class", "style", "checked", "selected", "disabled", "json", "dd", "dump", "use", "inject", "switch", "case", "break", "continue", "while", "endwhile", "env", "endenv", "production", "endproduction", "hasSection", "sectionMissing", "csrf", "method", "vite"];
+    let todo_names = ["php", "endphp", "can", "endcan", "cannot", "endcannot", "once", "endonce", "props", "component", "endcomponent", "slot", "endslot", "livewire", "lang", "error", "enderror", "class", "style", "dd", "dump", "use", "inject", "continue", "while", "endwhile", "env", "endenv", "production", "endproduction", "hasSection", "sectionMissing", "csrf", "method", "vite"];
     let mut out = String::new();
     let mut i = 0;
     let mut stack: Vec<&str> = vec![]; // "forelse" / "other"
+    let mut pushed: std::collections::HashSet<String> = std::collections::HashSet::new();
     while i < s3.len() {
         let Some(m) = known.find_at(&s3, i) else {
             out.push_str(&s3[i..]);
@@ -371,6 +372,48 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
                 out.push_str(&format!("{{% block {} %}}{def}{{% endblock %}}", unquote(parts.first().map(|x| x.as_str()).unwrap_or(""))));
             }
             "parent" => out.push_str("{{ super() }}"),
+            "stack" => out.push_str(&format!("{{% block stack_{} %}}{{% endblock %}}", unquote(&arg))),
+            "push" | "prepend" => {
+                let n = unquote(&arg);
+                if pushed.insert(n.clone()) {
+                    out.push_str(&format!("{{% block stack_{n} %}}{{{{ super() }}}}"));
+                } else {
+                    fail!("同じスタックへの2回目の @push は未対応(Jinja2 のブロックは名前が1つだけ)");
+                    out.push_str("{% block stack_dup_unsupported %}");
+                }
+            }
+            "endpush" | "endprepend" => out.push_str("{% endblock %}"),
+            "auth" | "guest" => {
+                warn.push(format!("{name}:{line} @{dname}: 簡易判定(Authorization ヘッダーの有無)。本物の認証へ差し替えること"));
+                let c = if dname == "auth" { "request.headers.get('authorization')" } else { "not request.headers.get('authorization')" };
+                out.push_str(&format!("{{% if {c} %}}"));
+                stack.push("other");
+            }
+            "endauth" | "endguest" | "endswitch" => {
+                stack.pop();
+                out.push_str("{% endif %}");
+            }
+            "switch" => match jexpr(&arg) {
+                Ok(j) => {
+                    out.push_str(&format!("{{% set _sw = {j} %}}{{% if false %}}"));
+                    stack.push("other");
+                }
+                Err(why) => fail!(&why),
+            },
+            "case" => match jexpr(&arg) {
+                Ok(j) => out.push_str(&format!("{{% elif _sw == {j} %}}")),
+                Err(why) => fail!(&why),
+            },
+            "default" => out.push_str("{% else %}"),
+            "break" => {}
+            "checked" | "selected" | "disabled" => match jexpr(&arg) {
+                Ok(j) => out.push_str(&format!("{{{{ '{dname}' if {j} else '' }}}}")),
+                Err(why) => fail!(&why),
+            },
+            "json" => match jexpr(&arg) {
+                Ok(j) => out.push_str(&format!("{{{{ {j}|tojson }}}}")),
+                Err(why) => fail!(&why),
+            },
             "csrf" | "method" => {
                 warn.push(format!("{name}:{line} @{dname}: FastAPI に CSRF/メソッド偽装の仕組みは無いため出力しない(必要なら別途実装)"));
                 out.push_str(&format!("{{# pl2pl: @{dname} は出力しない #}}"));
@@ -394,6 +437,20 @@ fn continue_with(stack: &mut Vec<&'static str>, kind: &'static str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stacks_auth_switch() {
+        let mut w = vec![];
+        let o = convert("@push('js')<a>@endpush @stack('js') @auth yes @endauth @switch($n) @case(1) one @break @default other @endswitch <i @checked($on)> @json($x)", "t", &mut w);
+        assert!(o.contains("{% block stack_js %}{{ super() }}<a>{% endblock %}"), "{o}");
+        assert!(o.contains("{% block stack_js %}{% endblock %}"), "{o}");
+        assert!(o.contains("{% if request.headers.get('authorization') %} yes {% endif %}"), "{o}");
+        assert!(o.contains("{% set _sw = n %}{% if false %}") && o.contains("{% elif _sw == 1 %}") && o.contains("{% else %}"), "{o}");
+        assert!(o.contains("{{ 'checked' if on else '' }}") && o.contains("{{ x|tojson }}"), "{o}");
+        let mut w2 = vec![];
+        convert("@push('a')x@endpush @push('a')y@endpush", "t", &mut w2);
+        assert!(w2.iter().any(|x| x.contains("2回目")), "{w2:?}");
+    }
+
     #[test]
     fn basic_blade() {
         let mut w = vec![];

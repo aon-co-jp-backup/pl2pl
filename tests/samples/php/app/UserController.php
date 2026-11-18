@@ -108,4 +108,9 @@ class UserController {
     public function cursored() {
         return User::orderBy('id')->cursorPaginate(2);
     }
+    public function extras(Request $request) {
+        $n = 2;
+        $data = ['a' => 1];
+        return view('extras', compact('n', 'data'));
+    }
 }
