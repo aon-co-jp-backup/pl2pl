@@ -35,3 +35,4 @@
 - 通し試験は `tests/run-php.sh`(実 FastAPI・実 SQLite・実 Jinja2)。WSL から PowerShell 経由で `wsl -d Ubuntu -- bash <スクリプト>` で動かす(Git Bash はパスを書き換え、`$PATH` も展開される)。
 - 日本語を含むファイルは Python に `-X utf8` を付けて書く(Windows の既定は cp932)。引用符が混ざる長い文字列はシェルの heredoc ではなく Write ツールでファイルにしてから使う。
 - COBOL_to・Java_to の取り込み後の削除は、所有者の指示だが元に戻せない。取り込み内容を確認してから、最終確認を取って行う。
+- paginate: `Query.paginate(n, request)` が `Page`(dict 継承、`__iter__` は `data`)を返す。`request` 引数は本文に `, request)` か `request.query_params` があれば自動で付く。

@@ -92,7 +92,7 @@ pub fn jexpr(e: &str) -> Result<String, String> {
                 return t;
             }
             let mut t = t;
-            for (a, b) in [("===", "=="), ("!==", "!="), ("&&", " and "), ("||", " or "), ("$loop->iteration", "loop.index"), ("$loop->index", "loop.index0"), ("$loop->first", "loop.first"), ("$loop->last", "loop.last"), ("->", "."), (" . ", " ~ ")] {
+            for (a, b) in [("===", "=="), ("!==", "!="), ("&&", " and "), ("||", " or "), ("$loop->iteration", "loop.index"), ("$loop->index", "loop.index0"), ("$loop->first", "loop.first"), ("$loop->last", "loop.last"), ("->", "."), (".total()", ".total"), (" . ", " ~ ")] {
                 t = t.replace(a, b);
             }
             let t = Regex::new(r"!([^=])").unwrap().replace_all(&t, "not $1").to_string();

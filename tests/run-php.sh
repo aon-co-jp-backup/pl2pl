@@ -70,6 +70,19 @@ rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert [x["name"] for x in rr] == ["admin"], rr
 rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert len(rr) == 1, rr
+pg = c.get("/paged?page=1").json()
+assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
+assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg
+assert pg["next_page_url"] == "/paged?page=2" and pg["prev_page_url"] is None, pg
+last = c.get(f"/paged?page={pg['last_page']}").json()
+assert last["next_page_url"] is None and last["prev_page_url"] is not None and last["to"] == pg["total"], last
+assert c.get("/paged?page=abc").json()["current_page"] == 1
+pv = c.get("/paged-view?page=2&x=1")
+assert pv.status_code == 200 and f"Total {pg['total']}" in pv.text and 'class="u"' in pv.text, pv.text
+assert 'rel="prev"' in pv.text and "x=1" in pv.text and "<nav" in pv.text, pv.text
+ids = [u["id"] for u in c.get("/skipped").json()]
+assert len(ids) == 2 and ids == sorted(ids), ids
+assert c.get("/search?q=hi").json() == {"q": "hi"} and c.get("/search").json() == {"q": "none"}
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 print("php e2e OK", len(paths))

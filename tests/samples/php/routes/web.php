@@ -37,4 +37,8 @@ Route::get('/posts/{id}/author', [UserController::class, 'author']);
 Route::get('/with-posts', [UserController::class, 'withPosts']);
 Route::get('/published-authors', [UserController::class, 'publishedAuthors']);
 Route::post('/users/{id}/roles', [UserController::class, 'giveRole']);
+Route::get('/paged', [UserController::class, 'paged']);
+Route::get('/paged-view', [UserController::class, 'pagedView']);
+Route::get('/skipped', [UserController::class, 'skipped']);
+Route::get('/search', [UserController::class, 'search']);
 Route::post('/roles', function (Request $request) { return Role::create($request->all()); });

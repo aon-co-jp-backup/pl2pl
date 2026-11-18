@@ -201,6 +201,12 @@ fn arg_expr(a: &str) -> Option<String> {
     if a == "$request->all()" {
         return Some("(payload or {})".into());
     }
+    if let Some(c) = Regex::new(r#"^\$request->query\(\s*['"](\w+)['"]\s*(?:,\s*([^,]+?))?\s*\)$"#).unwrap().captures(a) {
+        return Some(match c.get(2).and_then(|d| php_value(d.as_str())) {
+            Some(d) => format!("request.query_params.get({:?}, {d})", &c[1]),
+            None => format!("request.query_params.get({:?})", &c[1]),
+        });
+    }
     if let Some(c) = Regex::new(r#"^\$request->(?:input|get|post)\(\s*['"](\w+)['"]\s*\)$"#).unwrap().captures(a) {
         return Some(format!("(payload or {{}}).get({:?})", &c[1]));
     }
@@ -372,12 +378,27 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
     let mut terminal = false;
     let mut one = false;
     let mut first = true;
+    let mut paged = false;
     for seg in chain {
         let c = call.captures(&seg)?;
         let (name, raw) = (c[1].to_string(), c[2].to_string());
         let args: Vec<String> = if raw.trim().is_empty() { vec![] } else { split_args(&raw) };
+        if terminal && paged && (name == "withQueryString" || name == "appends") {
+            continue; // links() が現在のクエリ文字列を常に引き継ぐので不要
+        }
         if terminal {
             return None; // 終端(get/first/...)の後に続きがある
+        }
+        if (name == "paginate" || name == "simplePaginate") && args.len() <= 1 {
+            let n = match args.first() {
+                Some(x) => arg_expr(x)?,
+                None => "15".to_string(),
+            };
+            terminal = true;
+            paged = true;
+            py.push_str(&format!(".paginate({n}, request)"));
+            first = false;
+            continue;
         }
         if name == "whereHas" || name == "has" {
             let rel = unq(args.first()?);
@@ -406,6 +427,7 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
             ("oldest", 0) => ".order_by(\"id\", \"asc\")".to_string(),
             ("oldest", 1) => format!(".order_by({}, \"asc\")", a[0]),
             ("limit", 1) | ("take", 1) => format!(".limit({})", a[0]),
+            ("offset", 1) | ("skip", 1) => format!(".offset({})", a[0]),
             ("get", 0) | ("all", 0) => {
                 terminal = true;
                 ".get()".to_string()
@@ -771,6 +793,7 @@ const QUERY_PY: &str = r##"
 
 import operator as _op
 import re as _re
+from urllib.parse import urlencode as _urlencode
 
 _OPS = {"=": _op.eq, "==": _op.eq, "!=": _op.ne, "<>": _op.ne, "<": _op.lt, "<=": _op.le, ">": _op.gt, ">=": _op.ge}
 
@@ -788,6 +811,53 @@ def _py_match(row, col, op, val):
         return False
 
 
+class Page(dict):
+    """paginate() の結果。JSON にすると Laravel と同じ形、テンプレートでは繰り返せて links() も使える。"""
+
+    def __init__(self, url, **kw):
+        super().__init__(**kw)
+        self._url = url
+
+    def __iter__(self):
+        return iter(self["data"])
+
+    def currentPage(self):
+        return self["current_page"]
+
+    def lastPage(self):
+        return self["last_page"]
+
+    def perPage(self):
+        return self["per_page"]
+
+    def hasPages(self):
+        return self["last_page"] > 1
+
+    def hasMorePages(self):
+        return self["current_page"] < self["last_page"]
+
+    def onFirstPage(self):
+        return self["current_page"] <= 1
+
+    def links(self):
+        from markupsafe import Markup
+
+        if not self.hasPages():
+            return Markup("")
+        cur, last = self["current_page"], self["last_page"]
+        parts = []
+        if cur > 1:
+            parts.append(Markup('<a href="{}" rel="prev">&laquo; Previous</a>').format(self._url(cur - 1)))
+        for p in range(1, last + 1):
+            if p == cur:
+                parts.append(Markup("<strong>{}</strong>").format(p))
+            else:
+                parts.append(Markup('<a href="{}">{}</a>').format(self._url(p), p))
+        if cur < last:
+            parts.append(Markup('<a href="{}" rel="next">Next &raquo;</a>').format(self._url(cur + 1)))
+        return Markup('<nav class="pagination">') + Markup(" ").join(parts) + Markup("</nav>")
+
+
 class Query:
     """Eloquent のクエリビルダの代わり。列(マイグレーション/$fillable)は SQL、extra の項目や or_where は Python 側で絞る。"""
 
@@ -796,6 +866,7 @@ class Query:
         self.conds = []
         self.orders = []
         self._limit = None
+        self._offset = 0
         self._with = []
         self.has = []
 
@@ -850,6 +921,8 @@ class Query:
                     q = q.order_by(getattr(c, col).desc() if desc else getattr(c, col))
                 if not self.orders:
                     q = q.order_by(c.id)
+                if self._offset:
+                    q = q.offset(self._offset)
                 if self._limit is not None:
                     q = q.limit(self._limit)
                 return self._decorate([r.to_dict() for r in q])
@@ -866,7 +939,40 @@ class Query:
             rows = [r for r in rows if any(all(_py_match(x, c, o, v) for c, o, v in hc) for x in getattr(self.cls, rel)(r))]
         for col, desc in reversed(self.orders):
             rows.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
+        rows = rows[self._offset:]
         return self._decorate(rows[: self._limit] if self._limit is not None else rows)
+
+    def offset(self, n):
+        self._offset = max(int(n), 0)
+        return self
+
+    def paginate(self, per_page=15, request=None, page_name="page"):
+        """Laravel の paginate()。?page=N を読み、Laravel と同じキーの Page(辞書)を返す。"""
+        per_page = max(int(per_page), 1)
+        qp = dict(request.query_params) if request is not None else {}
+        try:
+            page = max(int(qp.get(page_name, 1)), 1)
+        except ValueError:
+            page = 1
+        total = self.count()
+        saved = (self._limit, self._offset)
+        self._limit, self._offset = per_page, (page - 1) * per_page
+        rows = self.get()
+        self._limit, self._offset = saved
+        last = max(-(-total // per_page), 1)
+        qp.pop(page_name, None)
+        path = request.url.path if request is not None else ""
+
+        def url(p):
+            return path + "?" + _urlencode({**qp, page_name: p})
+
+        return Page(
+            url,
+            data=rows, current_page=page, per_page=per_page, total=total, last_page=last,
+            **{"from": (page - 1) * per_page + 1 if rows else None, "to": (page - 1) * per_page + len(rows) if rows else None},
+            next_page_url=url(page + 1) if page < last else None,
+            prev_page_url=url(page - 1) if page > 1 else None,
+        )
 
     def first(self):
         saved, self._limit = self._limit, 1
@@ -881,9 +987,10 @@ class Query:
         return r
 
     def count(self):
-        saved, self._limit = self._limit, None
+        saved = (self._limit, self._offset)
+        self._limit, self._offset = None, 0
         n = len(self.get())
-        self._limit = saved
+        self._limit, self._offset = saved
         return n
 
     def exists(self):
@@ -1178,7 +1285,7 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
                 rep.push(format!("{}:{} {} {} の本体は未変換(TODO)", "routes", r.line, r.verb.to_uppercase(), r.path));
             }
         }
-        if body_txt.contains("TemplateResponse(request,") {
+        if (body_txt.contains("TemplateResponse(request,") || body_txt.contains(", request)") || body_txt.contains("request.query_params")) && !params.iter().any(|p| p.starts_with("request:")) {
             params.insert(0, "request: Request".into());
         }
         m.push_str(&format!("\n\n@app.{}({:?}{dep_arg})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
@@ -1202,6 +1309,9 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
     if has_tpl {
         m = m.replacen("from fastapi import FastAPI\n", "from fastapi import FastAPI\nfrom fastapi import Request\nfrom fastapi.templating import Jinja2Templates\n", 1);
         m = m.replacen("app = FastAPI()\n", "app = FastAPI()\ntemplates = Jinja2Templates(directory=\"templates\")\n", 1);
+    }
+    if !has_tpl && m.contains("request: Request") {
+        m = m.replacen("from fastapi import FastAPI\n", "from fastapi import FastAPI\nfrom fastapi import Request\n", 1);
     }
     if !models.is_empty() {
         m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\n\nfrom models import {}\n", models.join(", ")), 1);

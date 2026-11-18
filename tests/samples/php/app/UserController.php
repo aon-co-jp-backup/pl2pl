@@ -78,4 +78,18 @@ class UserController {
         $user->roles()->attach($request->input('role_id'));
         return $user->roles;
     }
+    public function paged() {
+        return User::orderBy('id')->paginate(2);
+    }
+    public function pagedView(Request $request) {
+        $users = User::orderBy('id')->paginate(2)->withQueryString();
+        return view('paged', compact('users'));
+    }
+    public function skipped() {
+        return User::orderBy('id')->offset(1)->limit(2)->get();
+    }
+    public function search(Request $request) {
+        $q = $request->query('q', 'none');
+        return ['q' => $q];
+    }
 }
