@@ -1,0 +1,2 @@
+       01 PRICE PIC 9(3)V99 VALUE 12.50.
+       01 QTY PIC 9(2) VALUE 3.

@@ -1,0 +1,12 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. EVAL.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 N PIC 9 VALUE 3.
+       PROCEDURE DIVISION.
+           EVALUATE N
+               WHEN 1 DISPLAY "ONE"
+               WHEN 2 WHEN 3 DISPLAY "TWO-THREE"
+               WHEN OTHER DISPLAY "X"
+           END-EVALUATE.
+           STOP RUN.

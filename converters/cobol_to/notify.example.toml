@@ -1,0 +1,16 @@
+# version-control/config.toml に、自分の環境の値を書く。/ Put your own values in version-control/config.toml.
+# Trage eigene Werte ein. / Укажите свои значения.
+#
+# root   : クローンを置いたドライブ/フォルダの一番上(各ユーザーが指定。"F:/" は作者の例)
+#          the top drive/folder that holds your clones (each user sets it; "F:/" is the author's example)
+#          oberstes Laufwerk/Verzeichnis Ihrer Klone / верхний диск или папка с вашими клонами
+# owner  : 自分の GitHub の組織/ユーザー名(一番上)。[review] で使う。
+#          your GitHub organisation/user (the top level), used by [review]
+#          Ihre GitHub-Organisation bzw. Ihr Benutzername / ваша организация или пользователь GitHub
+root = "<your-drive-or-folder>"
+
+[notify]
+email_to = ["address-1@example.com", "address-2@example.com"]
+
+[review]
+owner = "<your-github-owner>"

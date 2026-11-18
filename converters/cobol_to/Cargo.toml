@@ -1,0 +1,10 @@
+[package]
+name = "cobol_to"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "COBOL dialect auto-detection and conversion to Rust/RPoem/Python stacks"
+
+[dependencies]
+rfd = "0.15"
+walkdir = "2"

@@ -1,0 +1,33 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MISC.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 SEL PIC 9 VALUE 2.
+       01 GRADE PIC 99 VALUE 85.
+          88 PASS-G VALUE 60 THRU 100.
+          88 FAIL-G VALUE 0 THRU 59.
+       01 A-NUM PIC 9(4) VALUE 1234.
+       01 A-ALT REDEFINES A-NUM PIC 9(4).
+       01 LONGMSG PIC X(40) VALUE "THIS IS A LONG LITERAL THAT CONTINUES
+      -    "ONTO THE NEXT LINE".
+       PROCEDURE DIVISION.
+       MAIN.
+           GO TO ONE TWO THREE DEPENDING ON SEL.
+       ONE.
+           DISPLAY "ONE".
+           GO TO DONE-P.
+       TWO.
+           DISPLAY "TWO" WITH NO ADVANCING.
+           DISPLAY "!".
+           GO TO DONE-P.
+       THREE.
+           DISPLAY "THREE".
+       DONE-P.
+           IF PASS-G DISPLAY "PASS" END-IF.
+           IF NOT FAIL-G DISPLAY "NOT-FAIL" END-IF.
+           MOVE 9999 TO A-ALT.
+           DISPLAY A-NUM.
+           DISPLAY LONGMSG.
+           CALL "GREET" USING A-NUM.
+           EXEC SQL SELECT 1 END-EXEC.
+           STOP RUN.
