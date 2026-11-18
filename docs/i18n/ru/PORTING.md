@@ -10,7 +10,6 @@
 4. Интеграция с aruaru-llm (реальная установка через `llm setup` пока не проверена).
 5. Kokkos на GPU / `Kokkos::View`; ядра на open-cuda / open-directx.
 6. Владелец пишет `docs/DESIGN.md`; проверить, что `docs/LANGUAGES.md` актуален.
-7. Запустить новые примеры PHP в CI на Linux arm64 и macOS.
 ## Тесты
 `bash tests/run-all.sh` (WSL), `bash tests/run-php.sh` (PHP, сквозной), `cargo test --release`.
 ## Сообщение для продолжения работы

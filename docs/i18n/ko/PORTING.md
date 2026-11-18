@@ -10,7 +10,6 @@ v0.1.0이 공개되었고, Windows·Linux·macOS 설치 프로그램과 CI의 �
 4. aruaru-llm 연동(`llm setup`의 실제 설치는 아직 미확인).
 5. Kokkos GPU / `Kokkos::View`, open-cuda / open-directx의 커널.
 6. 소유자가 `docs/DESIGN.md`를 작성하고, `docs/LANGUAGES.md`가 최신인지 확인.
-7. Linux arm64와 macOS CI에서 새 PHP 샘플 실행.
 ## 시험
 `bash tests/run-all.sh`(WSL), `bash tests/run-php.sh`(PHP 종단 간), `cargo test --release`.
 ## 작업을 다시 시작할 때 쓸 메시지

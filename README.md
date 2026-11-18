@@ -42,6 +42,8 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 | `pl2pl llm setup` / `llm start` | 同梱の aruaru-llm を起動し、空きメモリに合うモデル(Qwen2.5)を自動選択して導入 | 選択ロジックと --dry-run のみ(実導入は未確認) |
 | `pl2pl doctor` | open-cpu(内蔵)の CPU 情報 | 実行確認 |
 
+CI(`.github/workflows/test.yml`)が push ごとに単体テストと PHP の通し試験を Linux x64・Linux arm64・macOS で実行する。
+
 同梱コンポーネントは [`components/README.md`](components/README.md)。試験は `bash tests/run-all.sh`(WSL)、PHP の通し試験は `bash tests/run-php.sh`。
 
 ## PHP 変換の対応範囲(`pl2pl php`)
@@ -60,7 +62,7 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 - 共通の中間表現(サーバー側・DB/SQL・画面側)。
 - aruaru-llm との連携(`llm setup` の実導入は未確認)。
 - Kokkos の GPU 実行・`Kokkos::View`、open-cuda / open-directx 上のカーネル実行。
-- CI(Linux arm64・macOS)での新サンプルの実行、`docs/LANGUAGES.md` から選んだ言語の組み合わせの追加(全組み合わせは作らない)。
+- `docs/LANGUAGES.md` から選んだ言語の組み合わせの追加(全組み合わせは作らない)。
 
 ## 注意
 - 判定は保守的です。依存や副作用の恐れがあるものは**付けずに理由を報告**し、性能は保証しません。

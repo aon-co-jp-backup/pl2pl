@@ -10,7 +10,6 @@ v0.1.0 is out, with installers for Windows, Linux and macOS and end-to-end tests
 4. aruaru-llm integration (a real `llm setup` install is still unverified).
 5. Kokkos on GPU / `Kokkos::View`; kernels on open-cuda / open-directx.
 6. The owner writes `docs/DESIGN.md`; check that `docs/LANGUAGES.md` is up to date.
-7. Run the new PHP samples in CI on Linux arm64 and macOS.
 ## Tests
 `bash tests/run-all.sh` (WSL), `bash tests/run-php.sh` (PHP end to end), `cargo test --release`.
 ## Message for resuming

@@ -33,7 +33,7 @@ Der Konverter geht bewusst vorsichtig vor. **Was sich nicht umwandeln lässt, wi
 - Eine gemeinsame Zwischendarstellung (Serverseite, Datenbank/SQL, Oberfläche), damit N Quellen und M Ziele nur N+M statt N×M Bausteine brauchen.
 - Anbindung an aruaru-llm. Erklärungen und die Übersetzung natürlicher Sprache bleiben vom Konverter getrennt; der Konverter selbst hängt nie von einem LLM ab.
 - Kokkos auf der GPU und `Kokkos::View` sowie die Ausführung von Kernels auf open-cuda / open-directx.
-- Die neuen PHP-Beispiele in der CI unter Linux arm64 und macOS ausführen und weitere Sprachpaare aus `docs/LANGUAGES.md` ergänzen (nicht jede Kombination wird gebaut).
+- Weitere Sprachpaare aus `docs/LANGUAGES.md` (nicht jede Kombination wird gebaut).
 
 ## Gut zu wissen
 pl2pl entscheidet im Zweifel vorsichtig. Wo ein Konstrukt Abhängigkeiten oder Nebenwirkungen haben könnte, wird es **nicht umgewandelt, sondern mit Begründung gemeldet**; eine bestimmte Laufzeit-Leistung wird nicht zugesichert. Getestet wurden bisher nur kleine, selbst geschriebene Beispiele, keine großen realen Programme.

@@ -33,7 +33,7 @@ Le convertisseur est volontairement prudent. **Ce qu'il ne sait pas convertir n'
 - Une représentation intermédiaire commune (côté serveur, base de données/SQL, interface), pour que N sources et M cibles demandent N+M composants au lieu de N×M.
 - Intégration d'aruaru-llm. Les explications et la traduction en langue naturelle restent séparées des convertisseurs, qui ne dépendent jamais d'un LLM.
 - Kokkos sur GPU et `Kokkos::View`, ainsi que l'exécution de noyaux sur open-cuda / open-directx.
-- Exécuter les nouveaux exemples PHP en CI sous Linux arm64 et macOS, et ajouter d'autres paires de langages tirées de `docs/LANGUAGES.md` (toutes les combinaisons ne seront pas construites).
+- D'autres paires de langages tirées de `docs/LANGUAGES.md` (toutes les combinaisons ne seront pas construites).
 
 ## Bon à savoir
 En cas de doute, pl2pl choisit la prudence. Lorsqu'une construction pourrait avoir une dépendance ou un effet de bord, elle est **laissée telle quelle et signalée avec la raison** ; aucune performance n'est promise. Jusqu'ici, seuls de petits exemples écrits à la main ont été testés, pas de gros programmes réels.

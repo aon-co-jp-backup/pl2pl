@@ -10,7 +10,6 @@ Version 0.1.0 ist veröffentlicht, mit Installern für Windows, Linux und macOS 
 4. Anbindung an aruaru-llm (eine echte Installation mit `llm setup` ist noch ungeprüft).
 5. Kokkos auf der GPU / `Kokkos::View`; Kernels auf open-cuda / open-directx.
 6. Der Eigentümer schreibt `docs/DESIGN.md`; prüfen, ob `docs/LANGUAGES.md` aktuell ist.
-7. Die neuen PHP-Beispiele in der CI unter Linux arm64 und macOS ausführen.
 ## Tests
 `bash tests/run-all.sh` (WSL), `bash tests/run-php.sh` (PHP Ende-zu-Ende), `cargo test --release`.
 ## Nachricht zum Weiterarbeiten

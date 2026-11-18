@@ -33,7 +33,7 @@ O conversor é cauteloso de propósito. **O que ele não consegue converter nunc
 - Uma representação intermediária comum (lado do servidor, banco de dados/SQL, interface) para que N origens e M destinos precisem de N+M peças em vez de N×M.
 - Integração com o aruaru-llm. Explicações e tradução de linguagem natural continuam separadas dos conversores, que nunca dependem de um LLM.
 - Kokkos em GPU e `Kokkos::View`, além de executar kernels em open-cuda / open-directx.
-- Executar os novos exemplos de PHP no CI em Linux arm64 e macOS e acrescentar mais pares de linguagens de `docs/LANGUAGES.md` (nem todas as combinações serão feitas).
+- Mais pares de linguagens de `docs/LANGUAGES.md` (nem todas as combinações serão feitas).
 
 ## Vale saber
 Na dúvida, o pl2pl opta pela cautela. Se uma construção puder ter dependências ou efeitos colaterais, ela **fica sem converter e o motivo é informado**, e não se promete nenhum desempenho. Até agora só foram testados exemplos pequenos escritos à mão, não programas reais grandes.

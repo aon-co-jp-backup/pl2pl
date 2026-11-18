@@ -10,7 +10,6 @@ v0.1.0 已發布,提供 Windows、Linux、macOS 安裝程式,CI 中有端對端�
 4. 串接 aruaru-llm(`llm setup` 的實際安裝尚未驗證)。
 5. Kokkos 的 GPU / `Kokkos::View`;open-cuda / open-directx 上的 kernel。
 6. 由擁有者撰寫 `docs/DESIGN.md`;確認 `docs/LANGUAGES.md` 是否為最新。
-7. 在 Linux arm64 與 macOS 的 CI 中執行新增的 PHP 範例。
 ## 測試
 `bash tests/run-all.sh`(WSL)、`bash tests/run-php.sh`(PHP 端對端)、`cargo test --release`。
 ## 恢復工作用的訊息

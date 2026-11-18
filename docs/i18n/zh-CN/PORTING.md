@@ -10,7 +10,6 @@ v0.1.0 已发布,提供 Windows、Linux、macOS 安装包,CI 中有端到端测�
 4. 接入 aruaru-llm(`llm setup` 的真实安装尚未验证)。
 5. Kokkos 的 GPU / `Kokkos::View`;open-cuda / open-directx 上的内核。
 6. 由所有者撰写 `docs/DESIGN.md`;核对 `docs/LANGUAGES.md` 是否为最新。
-7. 在 Linux arm64 和 macOS 的 CI 中运行新增的 PHP 示例。
 ## 测试
 `bash tests/run-all.sh`(WSL)、`bash tests/run-php.sh`(PHP 端到端)、`cargo test --release`。
 ## 恢复工作用的消息

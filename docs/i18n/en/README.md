@@ -33,7 +33,7 @@ The converter is deliberately cautious. **Whatever it cannot convert is never dr
 - A shared intermediate representation (server side, DB/SQL, UI side), so N sources and M targets need N+M parts instead of N×M.
 - aruaru-llm integration. Explanations and natural-language translation stay separate from the converters, which never depend on an LLM.
 - Kokkos on GPU and `Kokkos::View`, plus running kernels on open-cuda / open-directx.
-- Running the new PHP samples in CI on Linux arm64 and macOS, and adding more language pairs from `docs/LANGUAGES.md` (not every combination will be built).
+- More language pairs chosen from `docs/LANGUAGES.md` (not every combination will be built).
 
 ## Good to know
 pl2pl errs on the side of caution. If a construct might have a dependency or side effect, it is **left unconverted and reported with the reason**, and no performance is promised. So far only small hand-written samples have been tested, not large real-world programs.

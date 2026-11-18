@@ -1,17 +1,16 @@
 # pl2pl 引き継ぎ
-## 到達点(2026-11-18)
+## 到達点(2026-11-19)
 v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
 PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
-1. PHP: リレーションの残り(`morph` 系)、`@can` 系の認可・クラスベースの Blade コンポーネント。
+1. PHP: `@can` 系の認可・クラスベースの Blade コンポーネント(`@component`)・`$attributes`・`@php`・`morphToMany`。
 2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
 5. Kokkos の GPU 実行・`Kokkos::View` への置き換え、open-cuda / open-directx 上のカーネル実行。
 6. `docs/DESIGN.md` の各節を所有者が書く。一覧(`docs/LANGUAGES.md`)の最新性の検証。
-7. CI(Linux arm64・macOS)での新サンプル(PHP の SQLAlchemy・Jinja2・ミドルウェア)の実行。
 ## 再開用メッセージ
-「F:\pl2pl を再開。PORTING.md の未了の1から進める(PHP の残りの項目)。変換できない箇所は黙って落とさず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は確認してから。」
+「F:\pl2pl を再開。PORTING.md の未了の1から進める(PHP の残りの項目)。変換できない箇所は黙って落とさず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は区切りのよいところで確認なしに進めてよい(所有者の指示)。」
 ---
 ## 決定済み(訂正済み: WEB版は説明とダウンロードのみ、変換はPCアプリ。主要変換元=OSACCESS・ACCESS VBA・VB・VB.NET・VBA・C・C++・C#.NET・COBOL) / Decided (corrected: web = downloads and manuals only; conversion in the PC app)
 以下は訂正前の記述 / Text below predates the correction:
@@ -68,3 +67,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記18**: Blade の無名コンポーネント(`<x-alert type="error" :title="$h">本文</x-alert>`・自己閉じ・`<x-slot:名前>`/`<x-slot name="..">`・`@props` の既定値)を変換(`{% with %}`+`{% set slot %}`+`{% include "components/…" %}`)。実FastAPIの通し試験成功、単体32件成功。未対応: `morph` 系・`@component`/クラスベースのコンポーネント・`$attributes`・`@can` 系・`@php`。
 
 **2026-11-19 追記19**: PHP の `morphMany`/`morphOne`/`morphTo` を変換(`<名前>_id`・`<名前>_type` 列を追加し、型の値には持ち主のクラス名を保存。`$post->tags`・`->tags()->create()`・`$note->noteable`・`with('tags')` に対応)。実SQLiteの通し試験成功、単体32件成功。未対応: `morphToMany`/`morphedByMany`・`@component`/クラスベースのコンポーネント・`$attributes`・`@can` 系・`@php`。
+
+**2026-11-19 追記20**: `.github/workflows/test.yml` を追加し、push・PR ごとに単体テストと PHP 通し試験を Linux x64・Linux arm64(ubuntu-24.04-arm)・macOS で実行。3 OS とも成功(run 44416117420)。未了の7番(新サンプルの CI 実行)は解消。
