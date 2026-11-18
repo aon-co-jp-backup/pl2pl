@@ -1,0 +1,31 @@
+name: test
+
+# push・PR のたびに、単体テストと PHP → FastAPI の通し試験(実 FastAPI・SQLite・Jinja2)を動かす。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust ツールチェーン
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: ビルドと単体テスト
+        run: |
+          cargo build --release
+          cargo test --release
+      - name: PHP 通し試験の Python 環境
+        run: |
+          python3 -m venv "$HOME/2fa-venv"
+          "$HOME/2fa-venv/bin/pip" install --quiet fastapi httpx sqlalchemy jinja2
+      - name: PHP → FastAPI の通し試験
+        run: B="$PWD/target/release/pl2pl" bash tests/run-php.sh
