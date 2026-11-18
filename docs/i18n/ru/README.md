@@ -23,12 +23,12 @@ pl2pl преобразует код между языками программи
 - **Тела функций**: простой `return`, тела из нескольких операторов, `response()->json($x, 201)` и `noContent()`.
 - **Eloquent → SQLAlchemy** (`db.py`, `models.py`): столбцы берутся из миграций или `$fillable`, всё остальное попадает в JSON-столбец `extra`. База данных задаётся через `DATABASE_URL` (по умолчанию SQLite).
 - **Конструктор запросов**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate` (читает `?page=N`, возвращает JSON в формате Laravel, в Blade работает `links()`), `get / first / firstOrFail / count / exists / delete` и `$request->query('k', значение по умолчанию)`.
-- **Связи**: `hasMany / hasOne / belongsTo / belongsToMany` (промежуточная таблица создаётся автоматически), `with`, в том числе вложенный `with('posts.comments')`, `whereHas / has / whereDoesntHave / doesntHave`, а также `attach / detach / sync`.
+- **Связи**: `hasMany / hasOne / belongsTo / belongsToMany / morphMany / morphOne / morphTo` (промежуточная таблица создаётся автоматически), `with`, в том числе вложенный `with('posts.comments')`, `whereHas / has / whereDoesntHave / doesntHave`, а также `attach / detach / sync`.
 - **Blade → Jinja2**: вывод значений, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` и другое.
 - **Middleware → `Depends`**: `auth` (лишь простая проверка Bearer — **её нужно заменить настоящей аутентификацией**), `guest`, `throttle:N,M` и собственные middleware вида «отклонить при условии, иначе `return $next($request)`».
 
 ## В планах (пока не сделано)
-- PHP: связи `morph`, авторизация вида `@can` и классовые компоненты Blade (анонимные компоненты `<x-...>` уже работают), а также middleware, изменяющий тело ответа после `$next` (добавление заголовков уже работает).
+- PHP: авторизация вида `@can` и классовые компоненты Blade (анонимные компоненты `<x-...>` уже работают), а также middleware, изменяющий тело ответа после `$next` (добавление заголовков уже работает).
 - Когда COBOL_to и Java_to созреют, влить их в pl2pl и удалить исходные репозитории. Это указание владельца; поскольку удаление нельзя отменить, после слияния его подтвердят ещё раз.
 - Общее промежуточное представление (серверная часть, база данных/SQL, интерфейс), чтобы для N источников и M целей нужно было N+M компонентов, а не N×M.
 - Интеграция с aruaru-llm. Пояснения и перевод естественного языка остаются отдельно от конвертеров, а сами конвертеры никогда не зависят от LLM.

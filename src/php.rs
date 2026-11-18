@@ -521,19 +521,32 @@ type Rels = HashMap<String, Vec<Rel>>;
 fn collect_relations(files: &[(String, String)]) -> Rels {
     let mut out = Rels::new();
     let cls = Regex::new(r"class\s+(\w+)\s+extends\s+(?:Model|Authenticatable|\w*Model)\b").unwrap();
-    let f = Regex::new(r"function\s+(\w+)\s*\(\s*\)\s*(?::\s*[\w\\?|]+\s*)?\{\s*return\s+\$this->(hasMany|hasOne|belongsTo|belongsToMany)\(([^;]*)\)\s*;\s*\}").unwrap();
+    let f = Regex::new(r"function\s+(\w+)\s*\(\s*\)\s*(?::\s*[\w\\?|]+\s*)?\{\s*return\s+\$this->(hasMany|hasOne|belongsTo|belongsToMany|morphMany|morphOne|morphTo)\(([^;]*)\)\s*;\s*\}").unwrap();
     let cr = Regex::new(r"([\w\\]+)::class").unwrap();
     for (_, src) in files {
         let Some(c) = cls.captures(src) else { continue };
         let owner = c[1].to_string();
         for m in f.captures_iter(src) {
             let args = split_args(&m[3]);
-            let Some(related) = args.first().and_then(|a| cr.captures(a)).map(|x| x[1].rsplit('\\').next().unwrap_or("").to_string()) else { continue };
+            let related = match args.first().and_then(|a| cr.captures(a)).map(|x| x[1].rsplit('\\').next().unwrap_or("").to_string()) {
+                Some(r) => r,
+                None if &m[2] == "morphTo" => String::new(),
+                None => continue,
+            };
             let arg = |i: usize| args.get(i).map(|a| unq(a)).filter(|a| !a.is_empty());
             let kind = m[2].to_string();
             let name = m[1].to_string();
             let (fk, other_fk, pivot) = match kind.as_str() {
                 "belongsTo" => (arg(1).unwrap_or_else(|| format!("{}_id", lower_snake(&name))), String::new(), String::new()),
+                // morph 系: fk = <名前>_id、other_fk = <名前>_type、pivot = 保存する型の値(morphMany/morphOne は持ち主のクラス名)
+                "morphMany" | "morphOne" => {
+                    let mn = arg(1).unwrap_or_else(|| lower_snake(&owner));
+                    (format!("{mn}_id"), format!("{mn}_type"), owner.clone())
+                }
+                "morphTo" => {
+                    let mn = args.first().map(|a| unq(a)).filter(|a| !a.is_empty()).unwrap_or_else(|| lower_snake(&name));
+                    (format!("{mn}_id"), format!("{mn}_type"), String::new())
+                }
                 "belongsToMany" => {
                     let mut names = [lower_snake(&owner), lower_snake(&related)];
                     names.sort();
@@ -552,13 +565,16 @@ fn apply_relations(schema: &mut Schema, rels: &Rels) {
     for (owner, list) in rels {
         for r in list {
             let target = match r.kind.as_str() {
-                "hasMany" | "hasOne" => &r.related,
-                "belongsTo" => owner,
+                "hasMany" | "hasOne" | "morphMany" | "morphOne" => &r.related,
+                "belongsTo" | "morphTo" => owner,
                 _ => continue,
             };
             if let Some((_, cols)) = schema.get_mut(target) {
                 if !cols.iter().any(|(n, _)| *n == r.fk) {
                     cols.push((r.fk.clone(), "Integer"));
+                }
+                if r.kind.starts_with("morph") && !cols.iter().any(|(n, _)| *n == r.other_fk) {
+                    cols.push((r.other_fk.clone(), "String"));
                 }
             }
         }
@@ -571,6 +587,14 @@ fn rel_methods(r: &Rel) -> String {
         "hasMany" | "hasOne" => {
             let get = if r.kind == "hasMany" { "get" } else { "first" };
             format!("\n    @classmethod\n    def {n}(cls, row):\n        return {rel}.query().where(\"{fk}\", \"=\", row[\"id\"]).{get}()\n\n    @classmethod\n    def {n}_create(cls, row, data):\n        return {rel}.create({{**(data or {{}}), \"{fk}\": row[\"id\"]}})\n")
+        }
+        "morphMany" | "morphOne" => {
+            let (get, t) = (if r.kind == "morphMany" { "get" } else { "first" }, &r.other_fk);
+            format!("\n    @classmethod\n    def {n}(cls, row):\n        return {rel}.query().where(\"{fk}\", \"=\", row[\"id\"]).where(\"{t}\", \"=\", \"{}\").{get}()\n\n    @classmethod\n    def {n}_create(cls, row, data):\n        return {rel}.create({{**(data or {{}}), \"{fk}\": row[\"id\"], \"{t}\": \"{}\"}})\n", r.pivot, r.pivot)
+        }
+        "morphTo" => {
+            let t = &r.other_fk;
+            format!("\n    @classmethod\n    def {n}(cls, row):\n        t, v = row.get(\"{t}\"), row.get(\"{fk}\")\n        return None if t is None or v is None else globals()[t].find(v)\n")
         }
         "belongsTo" => format!("\n    @classmethod\n    def {n}(cls, row):\n        v = row.get(\"{fk}\")\n        return None if v is None else {rel}.find(v)\n"),
         _ => {
@@ -618,7 +642,7 @@ fn rel_call(st: &str, vars: &HashMap<String, String>, rels: &Rels) -> Option<(St
     let model = vars.get(&c[1])?;
     let r = rels.get(model)?.iter().find(|r| r.name == c[2])?;
     let ok = match &c[3] {
-        "create" => r.kind == "hasMany" || r.kind == "hasOne",
+        "create" => matches!(r.kind.as_str(), "hasMany" | "hasOne" | "morphMany" | "morphOne"),
         _ => r.kind == "belongsToMany",
     };
     if !ok {
@@ -1350,8 +1374,17 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
     let mut k = 0;
     while k < models.len() {
         for r in rels.get(&models[k].clone()).into_iter().flatten() {
-            if !models.contains(&r.related) {
+            if !r.related.is_empty() && !models.contains(&r.related) {
                 models.push(r.related.clone());
+            }
+            if r.kind == "morphTo" {
+                // morphTo の行き先は、この型を morphMany/morphOne で持つモデル
+                let me = models[k].clone();
+                for (o, list) in rels.iter() {
+                    if list.iter().any(|x| x.kind.starts_with("morph") && x.kind != "morphTo" && x.related == me) && !models.contains(o) {
+                        models.push(o.clone());
+                    }
+                }
             }
         }
         k += 1;

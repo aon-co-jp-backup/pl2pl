@@ -101,6 +101,13 @@ assert "<i>in</i>" in c.get("/extras", headers={"Authorization": "Bearer z"}).te
 cp = c.get("/comp")
 assert cp.status_code == 200 and 'class="alert error"' in cp.text and 'class="alert info"' in cp.text, cp.text
 assert "<h4>T</h4>" in cp.text and "body <b>H&lt;1&gt;</b>" in cp.text and "plain" in cp.text, cp.text
+pid = p1.json()["id"]
+nt = c.post(f"/posts/{pid}/notes", json={"text": "n1"})
+assert nt.status_code == 200 and nt.json()["noteable_id"] == pid and nt.json()["noteable_type"] == "Post", nt.text
+assert [n["text"] for n in c.get(f"/posts/{pid}/notes").json()] == ["n1"]
+assert c.get(f"/notes/{nt.json()['id']}/owner").json()["title"] == "t1"
+nw = [x for x in c.get("/notes-with").json() if x["id"] == pid][0]
+assert [n["text"] for n in nw["tags"]] == ["n1"], nw
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg

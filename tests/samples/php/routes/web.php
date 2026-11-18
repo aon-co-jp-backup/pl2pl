@@ -48,4 +48,8 @@ Route::post('/posts/{id}/comments', [UserController::class, 'addComment']);
 Route::get('/cursored', [UserController::class, 'cursored']);
 Route::get('/extras', [UserController::class, 'extras']);
 Route::get('/comp', [UserController::class, 'comp']);
+Route::post('/posts/{id}/notes', [UserController::class, 'addNote']);
+Route::get('/posts/{id}/notes', [UserController::class, 'postNotes']);
+Route::get('/notes/{id}/owner', [UserController::class, 'noteOwner']);
+Route::get('/notes-with', [UserController::class, 'notesWith']);
 Route::post('/roles', function (Request $request) { return Role::create($request->all()); });

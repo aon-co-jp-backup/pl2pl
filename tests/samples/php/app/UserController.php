@@ -117,4 +117,19 @@ class UserController {
         $heading = 'H<1>';
         return view('comp', compact('heading'));
     }
+    public function addNote(Request $request, $id) {
+        $post = Post::findOrFail($id);
+        return $post->tags()->create($request->all());
+    }
+    public function postNotes($id) {
+        $post = Post::findOrFail($id);
+        return $post->tags;
+    }
+    public function noteOwner($id) {
+        $note = Note::findOrFail($id);
+        return $note->noteable;
+    }
+    public function notesWith() {
+        return Post::with('tags')->get();
+    }
 }
