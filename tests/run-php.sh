@@ -41,6 +41,21 @@ assert "<h1>With</h1>" in c.get("/people-with").text and "<small>few</small>" in
 ab = c.get("/about").text
 assert "About us &lt;b&gt;" in ab and "user@example.com" in ab, ab
 assert "About us" in c.get("/welcome").text
+assert c.get("/secure").status_code == 401 and c.get("/secure").json() == {"error": "no token"}
+assert c.get("/secure", headers={"X-Token": "bad"}).status_code == 403
+assert c.get("/secure", headers={"X-Token": "secret"}).json() == {"secure": True}
+import os
+os.environ["API_TOKENS"] = "t1,t2"
+assert c.get("/private/me").status_code == 401
+ok = {"Authorization": "Bearer t1"}
+assert c.get("/private/me", headers={"Authorization": "Bearer nope"}).status_code == 401
+assert c.get("/private/me", headers=ok).json() == {"me": 1}
+assert c.get("/private/me", headers=ok).json() == {"me": 1}
+r3 = c.get("/private/me", headers=ok)
+assert r3.status_code == 429 and "Retry-After" in r3.headers, r3.text
+assert c.get("/after").json() == "x"
+assert c.get("/guestonly").json() == "g"
+assert c.get("/guestonly", headers=ok, follow_redirects=False).status_code == 302
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 print("php e2e OK", len(paths))

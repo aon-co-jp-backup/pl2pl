@@ -10,12 +10,13 @@ pub struct Route {
     pub class: String,
     pub method: String,
     pub body: Option<String>, // 単純なクロージャの翻訳済み return 式
+    pub mw: Vec<String>,      // ミドルウェア名(グループ・ルート指定・コントローラの __construct)
     pub raw: Option<String>,  // クロージャ本体の PHP 原文(複数文の変換用)
     pub src: String,
     pub line: usize,
 }
 
-fn matching(s: &str, open: usize, o: char, c: char) -> Option<usize> {
+pub(crate) fn matching(s: &str, open: usize, o: char, c: char) -> Option<usize> {
     let mut depth = 0;
     let mut quote: Option<char> = None;
     for (off, ch) in s[open..].char_indices() {
@@ -39,7 +40,7 @@ fn matching(s: &str, open: usize, o: char, c: char) -> Option<usize> {
     None
 }
 
-fn split_args(s: &str) -> Vec<String> {
+pub(crate) fn split_args(s: &str) -> Vec<String> {
     // トップレベルのカンマで分ける
     let (mut v, mut cur, mut depth, mut q) = (vec![], String::new(), 0i32, None::<char>);
     for ch in s.chars() {
@@ -76,7 +77,7 @@ fn split_args(s: &str) -> Vec<String> {
     v
 }
 
-fn unq(s: &str) -> String {
+pub(crate) fn unq(s: &str) -> String {
     s.trim().trim_matches(|c| c == '\'' || c == '"').to_string()
 }
 
@@ -98,7 +99,7 @@ pub fn snake(s: &str) -> String {
 }
 
 /// 単純な PHP の値を Python へ(文字列・数・真偽・平らな配列)。できなければ None。
-fn php_value(s: &str) -> Option<String> {
+pub(crate) fn php_value(s: &str) -> Option<String> {
     let s = s.trim().trim_end_matches(';').trim();
     if (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2) || (s.starts_with('"') && s.ends_with('"') && s.len() >= 2 && !s.contains('$')) {
         return Some(format!("{:?}", &s[1..s.len() - 1]));
@@ -759,13 +760,21 @@ fn join_path(prefix: &str, p: &str) -> String {
 
 fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, warn: &mut Vec<String>, name: &str) {
     // グループ(prefix)を先に処理し、その範囲を空白で潰してから残りを読む
-    let grp = Regex::new(r#"Route::(?:\w+\([^)]*\)->)*prefix\(\s*['"]([^'"]*)['"]\s*\)(?:->\w+\([^)]*\))*->group\(\s*function\s*\([^)]*\)\s*\{"#).unwrap();
+    let grp = Regex::new(r#"Route::((?:\w+\([^)]*\)->)+)group\(\s*function\s*\([^)]*\)\s*\{"#).unwrap();
+    let grp_prefix = Regex::new(r#"prefix\(\s*['"]([^'"]*)['"]\s*\)"#).unwrap();
+    let grp_mw = Regex::new(r"middleware\(([^)]*)\)").unwrap();
     let mut masked = src.to_string();
     for m in grp.captures_iter(src) {
         let open = m.get(0).unwrap().end() - 1;
         if let Some(close) = matching(src, open, '{', '}') {
             let inner = &src[open + 1..close];
-            parse_laravel(inner, &join_path(prefix, &m[1]), line0 + crate::util::line_of(src, open) - 1, out, warn, name);
+            let gp = grp_prefix.captures(&m[1]).map(|c| c[1].to_string()).unwrap_or_default();
+            let gmw: Vec<String> = grp_mw.captures_iter(&m[1]).flat_map(|c| crate::middleware::parse_names(&c[1])).collect();
+            let before = out.len();
+            parse_laravel(inner, &join_path(prefix, &gp), line0 + crate::util::line_of(src, open) - 1, out, warn, name);
+            for r in &mut out[before..] {
+                r.mw.splice(0..0, gmw.iter().cloned());
+            }
             let blank: String = src[m.get(0).unwrap().start()..close + 1].chars().map(|c| if c == '\n' { '\n' } else { ' ' }).collect();
             masked.replace_range(m.get(0).unwrap().start()..close + 1, &blank);
         }
@@ -777,6 +786,7 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
         let args = split_args(&masked[open + 1..close]);
         let line = line0 + crate::util::line_of(&masked, open) - 1;
         let verb = m[1].to_string();
+        let mw = crate::middleware::route_mw(&masked[close + 1..]);
         if args.is_empty() {
             continue;
         }
@@ -784,7 +794,7 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
         let handler = args.get(1).cloned().unwrap_or_default();
         if verb == "view" {
             if args.len() >= 2 {
-                out.push(Route { verb: "get".into(), path: path.clone(), handler: "view".into(), class: String::new(), method: "view".into(), body: None, raw: Some(format!("return view({});", args[1..].join(", "))), src: String::new(), line });
+                out.push(Route { verb: "get".into(), path: path.clone(), handler: "view".into(), class: String::new(), method: "view".into(), body: None, raw: Some(format!("return view({});", args[1..].join(", "))), mw: mw.clone(), src: String::new(), line });
             }
             continue;
         }
@@ -797,7 +807,7 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
                 warn.push(format!("{name}:{line} Route::resource の create/edit(HTML フォーム)は変換していません"));
             }
             for (v, p, meth) in rs.drain(..) {
-                out.push(Route { verb: v.into(), path: p, handler: format!("{class}@{meth}"), class: class.clone(), method: meth.into(), body: None, raw: None, src: String::new(), line });
+                out.push(Route { verb: v.into(), path: p, handler: format!("{class}@{meth}"), class: class.clone(), method: meth.into(), body: None, raw: None, mw: mw.clone(), src: String::new(), line });
             }
             continue;
         }
@@ -819,7 +829,7 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
             continue;
         };
         for v in verbs {
-            out.push(Route { verb: v.into(), path: path.clone(), handler: label.clone(), class: class.clone(), method: method.clone(), body: body.clone(), raw: raw_closure.clone(), src: handler.chars().take(80).collect(), line });
+            out.push(Route { verb: v.into(), path: path.clone(), handler: label.clone(), class: class.clone(), method: method.clone(), body: body.clone(), raw: raw_closure.clone(), mw: mw.clone(), src: handler.chars().take(80).collect(), line });
         }
     }
 }
@@ -842,7 +852,7 @@ fn parse_symfony(src: &str, name: &str, out: &mut Vec<Route>, warn: &mut Vec<Str
                 warn.push(format!("{name}:{line} 未対応の動詞 {v}"));
                 continue;
             }
-            out.push(Route { verb: v, path: join_path(&prefix, &a[1]), handler: format!("{}@{}", &cm[1], &f[1]), class: cm[1].to_string(), method: f[1].to_string(), body: None, raw: None, src: String::new(), line });
+            out.push(Route { verb: v, path: join_path(&prefix, &a[1]), handler: format!("{}@{}", &cm[1], &f[1]), class: cm[1].to_string(), method: f[1].to_string(), body: None, raw: None, mw: vec![], src: String::new(), line });
         }
     }
 }
@@ -877,6 +887,10 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
     let sigs = collect_controllers(files);
     let bodies = collect_bodies(files);
     let schema = collect_schema(files);
+    let aliases = crate::middleware::collect_aliases(files);
+    let custom_mw = crate::middleware::collect_custom(files);
+    let ctor_mw = crate::middleware::collect_ctor(files);
+    let mut mwreg = crate::middleware::Registry::default();
     rep.extend(warn.iter().cloned());
     let mut used: Vec<String> = vec![];
     let mut models: Vec<String> = vec![];
@@ -908,6 +922,25 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
         if matches!(r.verb.as_str(), "post" | "put" | "patch") {
             params.push("payload: dict | None = None".into());
         }
+        let mut all_mw: Vec<String> = r.mw.clone();
+        if let Some(list) = ctor_mw.get(&r.class) {
+            for (n, only, except) in list {
+                let ok_only = only.as_ref().map(|o| o.contains(&r.method)).unwrap_or(true);
+                let ok_exc = except.as_ref().map(|e| !e.contains(&r.method)).unwrap_or(true);
+                if ok_only && ok_exc {
+                    all_mw.push(n.clone());
+                }
+            }
+        }
+        let mut deps: Vec<String> = vec![];
+        for tok in &all_mw {
+            if let Some(d) = mwreg.resolve(tok, &aliases, &custom_mw, &format!("{} {}", r.verb.to_uppercase(), r.path), rep) {
+                if !deps.contains(&d) {
+                    deps.push(d);
+                }
+            }
+        }
+        let dep_arg = if deps.is_empty() { String::new() } else { format!(", dependencies=[{}]", deps.iter().map(|d| format!("Depends({d})")).collect::<Vec<_>>().join(", ")) };
         let mut body_txt = String::new();
         let raw_body = bodies.get(&(r.class.clone(), r.method.clone())).or(r.raw.as_ref());
         let mut ctl_body = if r.body.is_none() { raw_body.and_then(|b| simple_return(b)) } else { None };
@@ -935,8 +968,12 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
         if body_txt.contains("TemplateResponse(request,") {
             params.insert(0, "request: Request".into());
         }
-        m.push_str(&format!("\n\n@app.{}({:?})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
+        m.push_str(&format!("\n\n@app.{}({:?}{dep_arg})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
         m.push_str(&body_txt);
+    }
+    if !mwreg.is_empty() {
+        m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\nfrom fastapi import Depends\n\nfrom middleware import MiddlewareAbort, {}\n", mwreg.used.join(", ")), 1);
+        m = m.replacen("app = FastAPI()\n", "app = FastAPI()\napp.add_exception_handler(MiddlewareAbort, lambda request, exc: exc.response)\n", 1);
     }
     let has_tpl = need_tpl || !blade_files.is_empty();
     if has_tpl {
@@ -961,6 +998,10 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
         outf.push(("db.py".to_string(), DB_PY.to_string()));
         outf.push(("models.py".to_string(), models_py(&models, &schema)));
         outf[1].1 = "fastapi\nuvicorn\nsqlalchemy\n".to_string();
+    }
+    if !mwreg.is_empty() {
+        outf.push(("middleware.py".to_string(), mwreg.render()));
+        rep.push(format!("ミドルウェア {} 個を Depends として middleware.py へ生成(auth は Bearer と環境変数 API_TOKENS で判定する簡易版。本物の認証へ差し替えること)", mwreg.used.len()));
     }
     if has_tpl {
         for (n, src) in &blade_files {

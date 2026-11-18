@@ -7,6 +7,7 @@ mod llm;
 mod loops;
 mod omp;
 mod blade;
+mod middleware;
 mod php;
 mod web;
 mod util;

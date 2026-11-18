@@ -25,3 +25,9 @@ Route::get('/people-compact', [UserController::class, 'peopleCompact']);
 Route::get('/people-with', [UserController::class, 'peopleWith']);
 Route::view('/about', 'about');
 Route::get('/welcome', function () { return view('about'); });
+Route::get('/secure', function () { return ['secure' => true]; })->middleware('token');
+Route::middleware(['auth', 'throttle:2,1'])->prefix('private')->group(function () {
+    Route::get('/me', function () { return ['me' => 1]; });
+});
+Route::get('/after', function () { return 'x'; })->middleware('localonly');
+Route::get('/guestonly', function () { return 'g'; })->middleware('guest');
