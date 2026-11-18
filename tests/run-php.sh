@@ -70,6 +70,10 @@ rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert [x["name"] for x in rr] == ["admin"], rr
 rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert len(rr) == 1, rr
+assert uid not in [x["id"] for x in c.get("/unpublished").json()]
+lone = c.post("/users", json={"name": "lone", "age": 1}).json()["id"]
+assert lone in [x["id"] for x in c.get("/unpublished").json()]
+assert lone in [x["id"] for x in c.get("/no-posts").json()] and uid not in [x["id"] for x in c.get("/no-posts").json()]
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg

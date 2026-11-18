@@ -41,4 +41,6 @@ Route::get('/paged', [UserController::class, 'paged']);
 Route::get('/paged-view', [UserController::class, 'pagedView']);
 Route::get('/skipped', [UserController::class, 'skipped']);
 Route::get('/search', [UserController::class, 'search']);
+Route::get('/unpublished', [UserController::class, 'unpublished']);
+Route::get('/no-posts', [UserController::class, 'noPosts']);
 Route::post('/roles', function (Request $request) { return Role::create($request->all()); });

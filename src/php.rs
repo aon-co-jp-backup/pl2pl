@@ -400,13 +400,14 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
             first = false;
             continue;
         }
-        if name == "whereHas" || name == "has" {
+        if matches!(name.as_str(), "whereHas" | "has" | "whereDoesntHave" | "doesntHave") {
+            let neg = if name.contains("oesnt") { ", True" } else { "" };
             let rel = unq(args.first()?);
             let conds = match args.get(1) {
                 None => "[]".to_string(),
                 Some(c) => has_conds(c)?,
             };
-            py.push_str(&format!(".where_has({rel:?}, {conds})"));
+            py.push_str(&format!(".where_has({rel:?}, {conds}{neg})"));
             first = false;
             continue;
         }
@@ -874,8 +875,8 @@ class Query:
         self._with += [rels] if isinstance(rels, str) else list(rels)
         return self
 
-    def where_has(self, rel, conds=None):
-        self.has.append((rel, conds or []))
+    def where_has(self, rel, conds=None, negate=False):
+        self.has.append((rel, conds or [], negate))
         return self
 
     def _decorate(self, rows):
@@ -935,8 +936,8 @@ class Query:
                     res = m if res is None else ((res or m) if k == "or" else (res and m))
                 return res
             rows = [r for r in rows if keep(r)]
-        for rel, hc in self.has:
-            rows = [r for r in rows if any(all(_py_match(x, c, o, v) for c, o, v in hc) for x in getattr(self.cls, rel)(r))]
+        for rel, hc, neg in self.has:
+            rows = [r for r in rows if any(all(_py_match(x, c, o, v) for c, o, v in hc) for x in getattr(self.cls, rel)(r)) != neg]
         for col, desc in reversed(self.orders):
             rows.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
         rows = rows[self._offset:]
@@ -1410,7 +1411,8 @@ mod tests {
         assert!(!one);
         assert!(query_expr("User::where('a', 1)->first()").unwrap().2);
         assert!(query_expr("User::where('a', 1)").is_none()); // 終端なし
-        assert!(query_expr("User::where('a', 1)->whereDoesntHave('x')->get()").is_none()); // 未対応は TODO のまま
+        assert!(query_expr("User::where('a', 1)->whereHasMorph('x')->get()").is_none()); // 未対応は TODO のまま
+        assert!(query_expr("User::doesntHave('posts')->get()").unwrap().1.contains(".where_has(\"posts\", [], True)"));
         let (_, py, _) = query_expr("User::with('posts')->whereHas('posts', function ($q) { $q->where('published', true); })->get()").unwrap();
         assert_eq!(py, "User.query().with_(\"posts\").where_has(\"posts\", [(\"published\", \"=\", True)]).get()");
     }

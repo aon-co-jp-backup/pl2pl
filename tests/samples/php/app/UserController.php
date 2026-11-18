@@ -92,4 +92,10 @@ class UserController {
         $q = $request->query('q', 'none');
         return ['q' => $q];
     }
+    public function unpublished() {
+        return User::whereDoesntHave('posts', function ($q) { $q->where('published', true); })->get();
+    }
+    public function noPosts() {
+        return User::doesntHave('posts')->get();
+    }
 }
