@@ -389,14 +389,15 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
         if terminal {
             return None; // 終端(get/first/...)の後に続きがある
         }
-        if (name == "paginate" || name == "simplePaginate") && args.len() <= 1 {
+        if (name == "paginate" || name == "simplePaginate" || name == "cursorPaginate") && args.len() <= 1 {
             let n = match args.first() {
                 Some(x) => arg_expr(x)?,
                 None => "15".to_string(),
             };
             terminal = true;
             paged = true;
-            py.push_str(&format!(".paginate({n}, request)"));
+            let f = if name == "cursorPaginate" { "cursor_paginate" } else { "paginate" };
+            py.push_str(&format!(".{f}({n}, request)"));
             first = false;
             continue;
         }
@@ -985,6 +986,38 @@ class Query:
             next_page_url=url(page + 1) if page < last else None,
             prev_page_url=url(page - 1) if page > 1 else None,
         )
+
+    def cursor_paginate(self, per_page=15, request=None):
+        """Laravel の cursorPaginate()。cursor は「何件目から」を base64 にしたもの(Laravel の列値ベースとは異なる近似)。"""
+        import base64
+        import json
+
+        per_page = max(int(per_page), 1)
+        qp = dict(request.query_params) if request is not None else {}
+        try:
+            start = max(int(json.loads(base64.urlsafe_b64decode(qp.get("cursor", "") + "==")).get("offset", 0)), 0)
+        except Exception:
+            start = 0
+        qp.pop("cursor", None)
+        path = request.url.path if request is not None else ""
+        saved = (self._limit, self._offset)
+        self._limit, self._offset = per_page + 1, start
+        rows = self.get()
+        self._limit, self._offset = saved
+
+        def cur(n):
+            return base64.urlsafe_b64encode(json.dumps({"offset": n}).encode()).decode().rstrip("=")
+
+        more = len(rows) > per_page
+        rows = rows[:per_page]
+        nxt = cur(start + per_page) if more else None
+        prv = cur(max(start - per_page, 0)) if start > 0 else None
+        return {
+            "data": rows, "per_page": per_page, "path": path,
+            "next_cursor": nxt, "prev_cursor": prv,
+            "next_page_url": path + "?" + _urlencode({**qp, "cursor": nxt}) if nxt else None,
+            "prev_page_url": path + "?" + _urlencode({**qp, "cursor": prv}) if prv else None,
+        }
 
     def first(self):
         saved, self._limit = self._limit, 1

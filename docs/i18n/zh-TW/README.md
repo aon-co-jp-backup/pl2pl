@@ -22,13 +22,13 @@ pl2pl 是一套在程式語言、框架與作業系統之間轉換程式碼的�
 - **路由**:Laravel 的 `Route::get/post/put/patch/delete/any/resource/apiResource/view`、`prefix` 群組,以及 Symfony 的 `#[Route]`。
 - **函式本體**:單純的 `return`、多行敘述、`response()->json($x, 201)` 與 `noContent()`。
 - **Eloquent → SQLAlchemy**(`db.py`、`models.py`):欄位取自 migration 或 `$fillable`,其餘欄位存入 JSON 型別的 `extra` 欄。以 `DATABASE_URL` 指定資料庫(預設為 SQLite)。
-- **查詢建構器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate`(讀取 `?page=N`,回傳與 Laravel 相同結構的 JSON,Blade 中可用 `links()`)、`get / first / firstOrFail / count / exists / delete`,以及 `$request->query('k', 預設值)`。
+- **查詢建構器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate / cursorPaginate`(讀取 `?page=N`,回傳與 Laravel 相同結構的 JSON,Blade 中可用 `links()`)、`get / first / firstOrFail / count / exists / delete`,以及 `$request->query('k', 預設值)`。
 - **模型關聯**:`hasMany / hasOne / belongsTo / belongsToMany`(自動產生中介表)、`with`(含巢狀的 `with('posts.comments')`)、`whereHas / has / whereDoesntHave / doesntHave`,以及 `attach / detach / sync`。
 - **Blade → Jinja2**:輸出運算式、`@if`、`@foreach`、`@forelse`、`@for`、`@extends/@section/@yield/@include` 等。
 - **中介層 → `Depends`**:`auth`(僅是簡易的 Bearer 檢查,**請換成真正的驗證機制**)、`guest`、`throttle:N,M`,以及「符合條件就拒絕,否則 `return $next($request)`」形式的自訂中介層。
 
 ## 後續規劃(尚未完成)
-- PHP:`morph` 關聯、`cursorPaginate`、Blade 的元件、堆疊與授權指令,以及在 `$next` 之後處理回應的中介層。
+- PHP:`morph` 關聯、Blade 的元件、堆疊與授權指令,以及在 `$next` 之後處理回應的中介層。
 - 待 COBOL_to 與 Java_to 成熟後併入 pl2pl,並刪除原本的儲存庫。這是擁有者的指示;由於刪除無法復原,併入後會再確認一次。
 - 建立統一的中介表示(伺服器端、資料庫/SQL、畫面端),讓 N 種來源與 M 種目標只需 N+M 個元件,而不是 N×M 個。
 - 串接 aruaru-llm。說明文字與自然語言翻譯會和轉換器分開,轉換器本身不依賴 LLM。

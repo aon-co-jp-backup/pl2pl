@@ -22,13 +22,13 @@ The converter is deliberately cautious. **Whatever it cannot convert is never dr
 - **Routes**: Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, `prefix` groups, and Symfony `#[Route]`.
 - **Bodies**: simple `return`, multi-statement bodies, `response()->json($x, 201)` and `noContent()`.
 - **Eloquent → SQLAlchemy** (`db.py`, `models.py`): columns come from migrations or `$fillable`; anything else goes into a JSON `extra` column. `DATABASE_URL` selects the database (SQLite by default).
-- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate` (reads `?page=N`, returns Laravel-style JSON, `links()` works in Blade), `get / first / firstOrFail / count / exists / delete`, and `$request->query('k', default)`.
+- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate` (reads `?page=N`, returns Laravel-style JSON, `links()` works in Blade), `get / first / firstOrFail / count / exists / delete`, and `$request->query('k', default)`.
 - **Relations**: `hasMany / hasOne / belongsTo / belongsToMany` (pivot table generated), `with` including nested `with('posts.comments')`, `whereHas / has / whereDoesntHave / doesntHave`, and `attach / detach / sync`.
 - **Blade → Jinja2**: echoes, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` and more.
 - **Middleware → `Depends`**: `auth` (a simple Bearer check — **replace it with real authentication**), `guest`, `throttle:N,M`, and custom middleware of the form “reject on a condition, otherwise `return $next($request)`”.
 
 ## Planned (not done yet)
-- PHP: `morph` relations, `cursorPaginate`, Blade components, stacks and authorization directives, and middleware that post-processes the response after `$next`.
+- PHP: `morph` relations, Blade components, stacks and authorization directives, and middleware that post-processes the response after `$next`.
 - Merge COBOL_to and Java_to into pl2pl once they are mature, then delete the original repositories. This is the owner's instruction; since deletion cannot be undone, it will be confirmed again after the merge.
 - A shared intermediate representation (server side, DB/SQL, UI side), so N sources and M targets need N+M parts instead of N×M.
 - aruaru-llm integration. Explanations and natural-language translation stay separate from the converters, which never depend on an LLM.

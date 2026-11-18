@@ -58,3 +58,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記13**: PHP のネストした `with('posts.comments')` を変換(モデルに `REL_CLASS` を生成し、`_load` が再帰的に読み込む)。実SQLiteの通し試験成功。未対応: `morph` 系・`cursorPaginate`。
 
 **2026-11-19 追記14**: `docs/i18n/` の9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt)を、直訳調をやめて各言語の自然な言い回しで書き直した(ネイティブの検証は未実施)。ネストした `with` の対応も反映。
+
+**2026-11-19 追記15**: PHP の `cursorPaginate()` を変換(cursor は「何件目から」を base64 にした近似で、Laravel の列値ベースとは異なる)。実SQLiteの通し試験成功、i18n 9言語も追従。未対応: `morph` 系・Blade のコンポーネント/スタック/認可系・`$next` 後処理のミドルウェア。

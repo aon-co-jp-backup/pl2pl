@@ -22,13 +22,13 @@ pl2pl 是一款在编程语言、框架和操作系统之间转换代码的工�
 - **路由**:Laravel 的 `Route::get/post/put/patch/delete/any/resource/apiResource/view`、`prefix` 分组,以及 Symfony 的 `#[Route]`。
 - **函数体**:简单的 `return`、多条语句、`response()->json($x, 201)` 和 `noContent()`。
 - **Eloquent → SQLAlchemy**(`db.py`、`models.py`):列取自迁移文件或 `$fillable`,其余字段存入 JSON 类型的 `extra` 列。用 `DATABASE_URL` 指定数据库(默认 SQLite)。
-- **查询构造器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate`(读取 `?page=N`,返回与 Laravel 相同结构的 JSON,Blade 中可用 `links()`)、`get / first / firstOrFail / count / exists / delete`,以及 `$request->query('k', 默认值)`。
+- **查询构造器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate / cursorPaginate`(读取 `?page=N`,返回与 Laravel 相同结构的 JSON,Blade 中可用 `links()`)、`get / first / firstOrFail / count / exists / delete`,以及 `$request->query('k', 默认值)`。
 - **模型关联**:`hasMany / hasOne / belongsTo / belongsToMany`(自动生成中间表)、`with`(含嵌套的 `with('posts.comments')`)、`whereHas / has / whereDoesntHave / doesntHave`,以及 `attach / detach / sync`。
 - **Blade → Jinja2**:输出表达式、`@if`、`@foreach`、`@forelse`、`@for`、`@extends/@section/@yield/@include` 等。
 - **中间件 → `Depends`**:`auth`(只是简易的 Bearer 校验,**请换成真正的认证**)、`guest`、`throttle:N,M`,以及“满足条件就拒绝,否则 `return $next($request)`”形式的自定义中间件。
 
 ## 后续计划(尚未完成)
-- PHP:`morph` 关联、`cursorPaginate`、Blade 的组件、堆栈和授权指令,以及在 `$next` 之后处理响应的中间件。
+- PHP:`morph` 关联、Blade 的组件、堆栈和授权指令,以及在 `$next` 之后处理响应的中间件。
 - 待 COBOL_to 和 Java_to 成熟后并入 pl2pl,并删除原仓库。这是所有者的指示;由于删除无法撤销,并入后会再确认一次。
 - 建立统一的中间表示(服务端、数据库/SQL、界面端),让 N 种来源和 M 种目标只需 N+M 个组件,而不是 N×M 个。
 - 接入 aruaru-llm。说明文字和自然语言翻译与转换器分开,转换器本身不依赖 LLM。

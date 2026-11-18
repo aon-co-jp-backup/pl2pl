@@ -22,13 +22,13 @@ pl2pl은 프로그래밍 언어, 프레임워크, 운영체제 사이에서 코�
 - **라우트**: Laravel의 `Route::get/post/put/patch/delete/any/resource/apiResource/view`, `prefix` 그룹, Symfony의 `#[Route]`.
 - **본문**: 단순한 `return`, 여러 문장, `response()->json($x, 201)`, `noContent()`.
 - **Eloquent → SQLAlchemy**(`db.py`, `models.py`): 컬럼은 마이그레이션이나 `$fillable`에서 가져오고, 나머지는 JSON 형식의 `extra` 컬럼에 담습니다. `DATABASE_URL`로 데이터베이스를 지정합니다(기본값은 SQLite).
-- **쿼리 빌더**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate`(`?page=N`을 읽고 Laravel과 같은 구조의 JSON을 돌려주며, Blade에서는 `links()`를 쓸 수 있습니다), `get / first / firstOrFail / count / exists / delete`, 그리고 `$request->query('k', 기본값)`.
+- **쿼리 빌더**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate`(`?page=N`을 읽고 Laravel과 같은 구조의 JSON을 돌려주며, Blade에서는 `links()`를 쓸 수 있습니다), `get / first / firstOrFail / count / exists / delete`, 그리고 `$request->query('k', 기본값)`.
 - **모델 관계**: `hasMany / hasOne / belongsTo / belongsToMany`(중간 테이블 자동 생성), `with`(중첩된 `with('posts.comments')` 포함), `whereHas / has / whereDoesntHave / doesntHave`, `attach / detach / sync`.
 - **Blade → Jinja2**: 출력 표현식, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` 등.
 - **미들웨어 → `Depends`**: `auth`(간단한 Bearer 확인일 뿐이므로 **실제 인증으로 바꿔 쓰세요**), `guest`, `throttle:N,M`, 그리고 “조건에 맞으면 거부하고, 아니면 `return $next($request)`” 형태의 사용자 정의 미들웨어.
 
 ## 앞으로의 계획(아직 안 된 것)
-- PHP: `morph` 관계, `cursorPaginate`, Blade의 컴포넌트·스택·권한 지시문, `$next` 이후에 응답을 가공하는 미들웨어.
+- PHP: `morph` 관계, Blade의 컴포넌트·스택·권한 지시문, `$next` 이후에 응답을 가공하는 미들웨어.
 - COBOL_to와 Java_to가 충분히 다듬어지면 pl2pl에 합치고 원래 저장소는 삭제합니다. 소유자의 지시이며, 삭제는 되돌릴 수 없으므로 합친 뒤 한 번 더 확인합니다.
 - 공통 중간 표현(서버 쪽, DB/SQL, 화면 쪽)을 만들어, 입력 N개와 출력 M개를 N×M이 아니라 N+M개의 부품으로 처리합니다.
 - aruaru-llm 연동. 설명이나 자연어 번역은 변환기와 분리하며, 변환기 자체는 LLM에 의존하지 않습니다.

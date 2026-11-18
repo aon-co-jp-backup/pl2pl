@@ -22,13 +22,13 @@ Le convertisseur est volontairement prudent. **Ce qu'il ne sait pas convertir n'
 - **Routes** : Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, groupes `prefix`, et Symfony `#[Route]`.
 - **Corps de fonction** : `return` simple, corps à plusieurs instructions, `response()->json($x, 201)` et `noContent()`.
 - **Eloquent → SQLAlchemy** (`db.py`, `models.py`) : les colonnes viennent des migrations ou de `$fillable` ; tout le reste va dans une colonne JSON `extra`. `DATABASE_URL` choisit la base de données (SQLite par défaut).
-- **Query builder** : `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate` (lit `?page=N`, renvoie du JSON au format Laravel, `links()` fonctionne dans Blade), `get / first / firstOrFail / count / exists / delete`, ainsi que `$request->query('k', valeur par défaut)`.
+- **Query builder** : `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate` (lit `?page=N`, renvoie du JSON au format Laravel, `links()` fonctionne dans Blade), `get / first / firstOrFail / count / exists / delete`, ainsi que `$request->query('k', valeur par défaut)`.
 - **Relations** : `hasMany / hasOne / belongsTo / belongsToMany` (table pivot générée), `with` y compris imbriqué (`with('posts.comments')`), `whereHas / has / whereDoesntHave / doesntHave`, et `attach / detach / sync`.
 - **Blade → Jinja2** : affichages, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include`, etc.
 - **Middleware → `Depends`** : `auth` (une simple vérification Bearer — **à remplacer par une vraie authentification**), `guest`, `throttle:N,M`, et les middlewares personnalisés du type « refuser selon une condition, sinon `return $next($request)` ».
 
 ## À venir (pas encore fait)
-- PHP : relations `morph`, `cursorPaginate`, composants, piles et directives d'autorisation de Blade, et middleware qui retouche la réponse après `$next`.
+- PHP : relations `morph`, composants, piles et directives d'autorisation de Blade, et middleware qui retouche la réponse après `$next`.
 - Intégrer COBOL_to et Java_to à pl2pl une fois qu'ils seront matures, puis supprimer les dépôts d'origine. C'est la consigne du propriétaire ; comme une suppression est irréversible, elle sera reconfirmée après l'intégration.
 - Une représentation intermédiaire commune (côté serveur, base de données/SQL, interface), pour que N sources et M cibles demandent N+M composants au lieu de N×M.
 - Intégration d'aruaru-llm. Les explications et la traduction en langue naturelle restent séparées des convertisseurs, qui ne dépendent jamais d'un LLM.

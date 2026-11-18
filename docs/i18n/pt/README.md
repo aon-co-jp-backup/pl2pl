@@ -22,13 +22,13 @@ O conversor é cauteloso de propósito. **O que ele não consegue converter nunc
 - **Rotas**: Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, grupos `prefix` e Symfony `#[Route]`.
 - **Corpos de função**: `return` simples, corpos com várias instruções, `response()->json($x, 201)` e `noContent()`.
 - **Eloquent → SQLAlchemy** (`db.py`, `models.py`): as colunas vêm das migrations ou de `$fillable`; o restante vai para uma coluna JSON `extra`. `DATABASE_URL` escolhe o banco de dados (SQLite por padrão).
-- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate` (lê `?page=N`, devolve JSON no formato do Laravel e `links()` funciona no Blade), `get / first / firstOrFail / count / exists / delete` e `$request->query('k', valor padrão)`.
+- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate` (lê `?page=N`, devolve JSON no formato do Laravel e `links()` funciona no Blade), `get / first / firstOrFail / count / exists / delete` e `$request->query('k', valor padrão)`.
 - **Relações**: `hasMany / hasOne / belongsTo / belongsToMany` (a tabela pivô é gerada), `with`, inclusive aninhado (`with('posts.comments')`), `whereHas / has / whereDoesntHave / doesntHave` e `attach / detach / sync`.
 - **Blade → Jinja2**: saídas, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` e mais.
 - **Middleware → `Depends`**: `auth` (apenas uma verificação Bearer simples — **troque por uma autenticação de verdade**), `guest`, `throttle:N,M` e middleware próprio no formato «rejeitar se uma condição for atendida; senão `return $next($request)`».
 
 ## Planejado (ainda não feito)
-- PHP: relações `morph`, `cursorPaginate`, componentes, pilhas e diretivas de autorização do Blade, e middleware que ajusta a resposta depois de `$next`.
+- PHP: relações `morph`, componentes, pilhas e diretivas de autorização do Blade, e middleware que ajusta a resposta depois de `$next`.
 - Incorporar COBOL_to e Java_to ao pl2pl quando estiverem maduros e apagar os repositórios originais. É uma orientação do proprietário; como apagar não tem volta, será confirmado de novo depois da incorporação.
 - Uma representação intermediária comum (lado do servidor, banco de dados/SQL, interface) para que N origens e M destinos precisem de N+M peças em vez de N×M.
 - Integração com o aruaru-llm. Explicações e tradução de linguagem natural continuam separadas dos conversores, que nunca dependem de um LLM.

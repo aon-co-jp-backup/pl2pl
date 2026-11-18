@@ -79,6 +79,18 @@ assert cm.status_code == 200 and cm.json()["post_id"] == p1.json()["id"], cm.tex
 dp = [x for x in c.get("/deep").json() if x["id"] == uid][0]
 assert [cc["body"] for cc in [q for q in dp["posts"] if q["id"] == p1.json()["id"]][0]["comments"]] == ["hi"], dp
 assert [q for q in dp["posts"] if q["title"] == "t2"][0]["comments"] == [], dp
+cu1 = c.get("/cursored").json()
+assert len(cu1["data"]) == 2 and cu1["prev_cursor"] is None and cu1["next_cursor"], cu1
+cu2 = c.get(cu1["next_page_url"]).json()
+assert cu2["data"][0]["id"] > cu1["data"][-1]["id"] and cu2["prev_cursor"], cu2
+seen, cur = [], c.get("/cursored").json()
+while True:
+    seen += [x["id"] for x in cur["data"]]
+    if not cur["next_page_url"]:
+        break
+    cur = c.get(cur["next_page_url"]).json()
+assert seen == sorted(set(seen)) and len(seen) >= 3, seen
+assert c.get("/cursored?cursor=garbage").json()["data"][0]["id"] == cu1["data"][0]["id"]
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg

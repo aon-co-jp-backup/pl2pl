@@ -105,4 +105,7 @@ class UserController {
         $post = Post::findOrFail($id);
         return $post->comments()->create($request->all());
     }
+    public function cursored() {
+        return User::orderBy('id')->cursorPaginate(2);
+    }
 }
