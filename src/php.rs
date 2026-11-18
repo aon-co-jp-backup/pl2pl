@@ -105,6 +105,9 @@ fn php_value(s: &str) -> Option<String> {
     if s.parse::<f64>().is_ok() {
         return Some(s.to_string());
     }
+    if Regex::new(r"^\$\w+$").unwrap().is_match(s) {
+        return Some(s[1..].to_string()); // 引数(パス変数)をそのまま返す
+    }
     match s {
         "true" => return Some("True".into()),
         "false" => return Some("False".into()),
@@ -157,6 +160,23 @@ fn collect_controllers(files: &[(String, String)]) -> Sigs {
                 })
                 .collect();
             m.insert((c[1].to_string(), f[1].to_string()), params);
+        }
+    }
+    m
+}
+
+/// コントローラのメソッド本体(波括弧の中)を (class, method) で集める。
+fn collect_bodies(files: &[(String, String)]) -> HashMap<(String, String), String> {
+    let mut m = HashMap::new();
+    let cls = Regex::new(r"class\s+(\w+)").unwrap();
+    let func = Regex::new(r"public\s+function\s+(\w+)\s*\([^)]*\)\s*(?::\s*[\w\?|]+\s*)?\{").unwrap();
+    for (_, src) in files {
+        let Some(c) = cls.captures(src) else { continue };
+        for f in func.captures_iter(src) {
+            let open = f.get(0).unwrap().end() - 1;
+            if let Some(close) = matching(src, open, '{', '}') {
+                m.insert((c[1].to_string(), f[1].to_string()), src[open + 1..close].to_string());
+            }
         }
     }
     m
@@ -276,6 +296,7 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
     let mut warn = vec![];
     let routes = extract(files, &mut warn);
     let sigs = collect_controllers(files);
+    let bodies = collect_bodies(files);
     rep.extend(warn.iter().cloned());
     let mut used: Vec<String> = vec![];
     let mut m = String::from("\"\"\"pl2pl php が生成した FastAPI の骨組み。ルートと型を写し、本体は TODO。\"\"\"\nfrom fastapi import FastAPI\n\napp = FastAPI()\n");
@@ -305,7 +326,8 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
             params.push("payload: dict | None = None".into());
         }
         m.push_str(&format!("\n\n@app.{}({:?})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
-        match &r.body {
+        let ctl_body = if r.body.is_none() { bodies.get(&(r.class.clone(), r.method.clone())).and_then(|b| simple_return(b)) } else { None };
+        match r.body.as_ref().or(ctl_body.as_ref()) {
             Some(b) => m.push_str(&format!("    return {b}\n")),
             None => {
                 m.push_str(&format!("    # PHP: {} ({} {})\n    raise NotImplementedError(\"TODO(pl2pl): {} を移植する\")\n", r.handler, r.verb.to_uppercase(), r.path, r.handler));

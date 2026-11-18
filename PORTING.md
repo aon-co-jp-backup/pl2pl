@@ -24,3 +24,5 @@
 **2026-11-18 追記**: `pl2pl llm setup/start` と `installer/bundle-components.sh` を追加(aruaru-llm を同梱し、モデルは空きメモリに合わせて自動導入。重みは同梱しない)。実導入は未確認。 / Added `llm setup/start` and `bundle-components.sh`; weights are not bundled; a real install is unverified.
 
 **2026-11-18 追記**: `v0.1.0` を公開。Windows x64/ARM64 exe・Linux amd64/arm64 deb+tar.gz・macOS arm64/x64 pkg(未署名)を CI が作り、インストール→実行→削除の試験が全て成功(Linux 側は COBOL+JCL 実行・OpenMP 同一結果・cport・PHP→FastAPI の通し試験も成功)。 / `v0.1.0` released; all OS installers built and smoke-tested in CI.
+
+**2026-11-18 追記**: PHP→FastAPI で、コントローラの単純な `return <値>` と `return $引数` を本体として変換(従来はTODO)。`tests/run-php.sh` に `/health`・`/echo/{id}` を追加し WSL で成功。複雑な本体(Eloquent等)は従来どおりTODO。 / PHP→FastAPI now translates simple controller `return` bodies (incl. returning path params); e2e extended and passing; complex bodies stay TODO.

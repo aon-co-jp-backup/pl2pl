@@ -10,6 +10,8 @@ from main import app
 c = TestClient(app)
 assert c.get("/").json() == "home"
 assert c.get("/api/ping").json() == {"ok": True, "v": 1}
+assert c.get("/health").json() == {"status": "ok"}
+assert c.get("/echo/7").json() == {"id": 7}
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 try:
