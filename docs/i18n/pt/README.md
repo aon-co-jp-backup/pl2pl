@@ -1,40 +1,40 @@
-> Traduzido por IA, ainda não revisado por falantes nativos. Vale o original em japonês (raiz do repositório).
+> Esta versão é uma tradução feita por IA e ainda não foi revisada por falantes nativos. Vale o original em japonês, na raiz do repositório.
 
 # pl2pl
-Um **conversor entre linguagens de programação, frameworks e sistemas operacionais** (v0.1.0 publicada, em desenvolvimento). Há instaladores para Windows (x64/ARM64), Linux (amd64/arm64) e macOS (arm64/x64). A conversão é feita no aplicativo de PC instalado (CLI); a versão web oferece apenas manuais e downloads.
-A conversão é conservadora: **o que não pode ser convertido nunca é descartado em silêncio; fica como `TODO` e aparece no relatório com o motivo.**
+O pl2pl converte código entre linguagens de programação, frameworks e sistemas operacionais. Está na versão 0.1.0 e continua em desenvolvimento ativo. Há instaladores para Windows (x64/ARM64), Linux (amd64/arm64) e macOS (arm64/x64). A conversão é feita no aplicativo de desktop instalado (uma ferramenta de linha de comando); o site traz apenas os manuais e os downloads.
+O conversor é cauteloso de propósito. **O que ele não consegue converter nunca é descartado em silêncio: fica no resultado como um `TODO` e aparece no relatório junto com o motivo.**
 
 ## O que funciona hoje
-| Comando | Descrição |
+| Comando | O que faz |
 |---|---|
-| `pl2pl cobol` | COBOL (IBM) + JCL → GnuCOBOL (Linux) + bash. Verificado compilando e executando com o GnuCOBOL. |
-| `pl2pl omp` | Adiciona `#pragma omp parallel for` a laços C/C++ independentes (com redução de somas). Mesmo resultado do original. |
-| `pl2pl php` | Laravel / Symfony → FastAPI (veja abaixo). Testado de ponta a ponta com FastAPI, SQLite e Jinja2 reais. |
-| `pl2pl web` | Detecta Java / COBOL / Flask·Django e repassa a java_to, cobol_to, 2fastapi, 2poem. Verificado com arquivos reais. |
-| `pl2pl cport` | C de UNIX → cabeçalho de compatibilidade + substituição mecânica + orientações de portabilidade. Verificado com gcc. |
-| `pl2pl pyhpc` | Numba `@njit` para funções Python numéricas; `--mpi` gera um esqueleto mpi4py. Mesmo resultado no Numba. |
-| `pl2pl kokkos` | Laços independentes → Kokkos (`parallel_for` / `parallel_reduce`). Compilado e executado com Kokkos 4.5.01 (Serial). |
-| `pl2pl gpu` | (Protótipo) laços → `.cu` no estilo CUDA / HLSL. Somente saída; a execução em open-cuda / open-directx não foi verificada. |
-| `pl2pl llm setup` / `llm start` | Inicia o aruaru-llm incluído e instala um modelo Qwen2.5 compatível com a memória livre. Apenas a lógica de escolha e o --dry-run foram verificados. |
-| `pl2pl doctor` | Informações da CPU via open-cpu (embutido). |
+| `pl2pl cobol` | Converte COBOL da IBM com JCL para GnuCOBOL no Linux com bash. Verificado compilando e executando o resultado com o GnuCOBOL. |
+| `pl2pl omp` | Acrescenta `#pragma omp parallel for` aos laços de C/C++ que são independentes entre si, inclusive com redução de somas. O resultado é igual ao do original. |
+| `pl2pl php` | Converte Laravel / Symfony para FastAPI (detalhes abaixo). Testado de ponta a ponta com FastAPI, SQLite e Jinja2 de verdade. |
+| `pl2pl web` | Reconhece Java, COBOL e Flask/Django e repassa o trabalho ao java_to, cobol_to, 2fastapi ou 2poem. Verificado com arquivos reais. |
+| `pl2pl cport` | Transforma C de UNIX em um cabeçalho de compatibilidade, com substituições mecânicas e notas de portabilidade. Verificado com gcc. |
+| `pl2pl pyhpc` | Acrescenta Numba `@njit` às funções numéricas em Python; com `--mpi`, gera também um esqueleto de mpi4py. Mesmo resultado no Numba. |
+| `pl2pl kokkos` | Reescreve laços independentes como Kokkos (`parallel_for` / `parallel_reduce`). Compilado e executado com Kokkos 4.5.01 (Serial). |
+| `pl2pl gpu` | Protótipo: transforma laços em `.cu` no estilo CUDA ou em HLSL. Só a saída gerada foi verificada; a execução em open-cuda / open-directx ainda não foi testada. |
+| `pl2pl llm setup` / `llm start` | Inicia o aruaru-llm incluído e instala um modelo Qwen2.5 compatível com a memória livre. Só a escolha do modelo e o `--dry-run` foram verificados, não uma instalação real. |
+| `pl2pl doctor` | Mostra informações da CPU por meio do open-cpu, que já vem embutido. |
 
 ## Conversão de PHP (`pl2pl php`)
-- **Rotas**: Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, grupos `prefix`, Symfony `#[Route]`.
-- **Corpos**: `return` simples, várias instruções, `response()->json($x, 201)`, `noContent()`.
-- **Eloquent → SQLAlchemy** (`db.py`, `models.py`): colunas vêm das migrations ou de `$fillable`; os demais campos vão para uma coluna JSON `extra`; `DATABASE_URL` escolhe o banco (SQLite por padrão).
-- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate` (`?page=N`, JSON como no Laravel, `links()` no Blade), `get / first / firstOrFail / count / exists / delete`, `$request->query('k', padrão)`.
-- **Relações**: `hasMany / hasOne / belongsTo / belongsToMany` (tabela pivô gerada), `with`, `whereHas / has / whereDoesntHave / doesntHave`, `attach / detach / sync`.
-- **Blade → Jinja2**: saída, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` etc.
-- **Middleware → `Depends`**: `auth` (verificação Bearer simples, **substituir por autenticação real**), `guest`, `throttle:N,M`, middleware próprio «rejeitar conforme uma condição; senão `return $next($request)`».
+- **Rotas**: Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, grupos `prefix` e Symfony `#[Route]`.
+- **Corpos de função**: `return` simples, corpos com várias instruções, `response()->json($x, 201)` e `noContent()`.
+- **Eloquent → SQLAlchemy** (`db.py`, `models.py`): as colunas vêm das migrations ou de `$fillable`; o restante vai para uma coluna JSON `extra`. `DATABASE_URL` escolhe o banco de dados (SQLite por padrão).
+- **Query builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate` (lê `?page=N`, devolve JSON no formato do Laravel e `links()` funciona no Blade), `get / first / firstOrFail / count / exists / delete` e `$request->query('k', valor padrão)`.
+- **Relações**: `hasMany / hasOne / belongsTo / belongsToMany` (a tabela pivô é gerada), `with`, inclusive aninhado (`with('posts.comments')`), `whereHas / has / whereDoesntHave / doesntHave` e `attach / detach / sync`.
+- **Blade → Jinja2**: saídas, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` e mais.
+- **Middleware → `Depends`**: `auth` (apenas uma verificação Bearer simples — **troque por uma autenticação de verdade**), `guest`, `throttle:N,M` e middleware próprio no formato «rejeitar se uma condição for atendida; senão `return $next($request)`».
 
-## Previsto (ainda não feito)
-- PHP: `with('a.b')` aninhado, relações `morph`, `cursorPaginate`, componentes/pilhas/diretivas de autorização do Blade, middleware que processa a resposta depois de `$next`.
-- Incorporar COBOL_to e Java_to ao pl2pl quando estiverem maduros e apagar os repositórios originais (instrução do proprietário; apagar é irreversível, será confirmado de novo após a incorporação).
-- Uma representação intermediária comum (servidor, BD/SQL, interface) para que N origens e M destinos exijam N+M peças e não N×M.
-- Integração com o aruaru-llm (explicações e tradução de linguagem natural ficam separadas dos conversores; os conversores nunca dependem de um LLM).
-- Execução em GPU com Kokkos e `Kokkos::View`; execução de kernels em open-cuda / open-directx.
-- Executar os novos exemplos PHP no CI em Linux arm64 e macOS; mais pares de linguagens de `docs/LANGUAGES.md` (nem todas as combinações serão construídas).
+## Planejado (ainda não feito)
+- PHP: relações `morph`, `cursorPaginate`, componentes, pilhas e diretivas de autorização do Blade, e middleware que ajusta a resposta depois de `$next`.
+- Incorporar COBOL_to e Java_to ao pl2pl quando estiverem maduros e apagar os repositórios originais. É uma orientação do proprietário; como apagar não tem volta, será confirmado de novo depois da incorporação.
+- Uma representação intermediária comum (lado do servidor, banco de dados/SQL, interface) para que N origens e M destinos precisem de N+M peças em vez de N×M.
+- Integração com o aruaru-llm. Explicações e tradução de linguagem natural continuam separadas dos conversores, que nunca dependem de um LLM.
+- Kokkos em GPU e `Kokkos::View`, além de executar kernels em open-cuda / open-directx.
+- Executar os novos exemplos de PHP no CI em Linux arm64 e macOS e acrescentar mais pares de linguagens de `docs/LANGUAGES.md` (nem todas as combinações serão feitas).
 
-## Observações
-As decisões são conservadoras: havendo possível dependência ou efeito colateral, a construção **é deixada sem converter e o motivo é informado**; o desempenho não é garantido. Só foram testados pequenos exemplos próprios, não programas reais grandes.
-Documentos: `docs/DESIGN.md`, `docs/LANGUAGES.md`, `docs/COMBINATIONS.md`.
+## Vale saber
+Na dúvida, o pl2pl opta pela cautela. Se uma construção puder ter dependências ou efeitos colaterais, ela **fica sem converter e o motivo é informado**, e não se promete nenhum desempenho. Até agora só foram testados exemplos pequenos escritos à mão, não programas reais grandes.
+Para saber mais: `docs/DESIGN.md`, `docs/LANGUAGES.md`, `docs/COMBINATIONS.md`.

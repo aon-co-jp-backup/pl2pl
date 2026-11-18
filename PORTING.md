@@ -56,3 +56,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記12**: README・CLAUDE・PORTING を日本語+9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt、`docs/i18n/`)に展開。今できている部分と完成予定の機能を記載。AI翻訳でネイティブ検証前。原本(日本語)を更新したら各言語も追従させる。
 
 **2026-11-19 追記13**: PHP のネストした `with('posts.comments')` を変換(モデルに `REL_CLASS` を生成し、`_load` が再帰的に読み込む)。実SQLiteの通し試験成功。未対応: `morph` 系・`cursorPaginate`。
+
+**2026-11-19 追記14**: `docs/i18n/` の9言語(en・zh-CN・zh-TW・ko・de・fr・es・ru・pt)を、直訳調をやめて各言語の自然な言い回しで書き直した(ネイティブの検証は未実施)。ネストした `with` の対応も反映。

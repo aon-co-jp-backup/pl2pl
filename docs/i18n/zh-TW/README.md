@@ -1,40 +1,40 @@
-> 由 AI 翻譯,尚未經母語者校對。以日文原文(儲存庫根目錄)為準。
+> 本文由 AI 翻譯,尚未經母語人士校對,內容以儲存庫根目錄的日文原文為準。
 
 # pl2pl
-**程式語言、框架與作業系統之間的轉換工具**(v0.1.0 已發布,開發中)。提供 Windows(x64/ARM64)、Linux(amd64/arm64)、macOS(arm64/x64)安裝程式。轉換在已安裝的 PC 應用程式(CLI)中進行,網頁版僅提供說明書與下載。
-轉換採保守策略:**無法轉換的部分絕不會被悄悄丟棄,而是保留為 `TODO`,並在報告中說明原因。**
+pl2pl 是一套在程式語言、框架與作業系統之間轉換程式碼的工具,目前為 v0.1.0,仍持續開發中。提供 Windows(x64/ARM64)、Linux(amd64/arm64)與 macOS(arm64/x64)的安裝程式。轉換在安裝後的桌面應用程式(命令列)中進行,網站只提供說明書與下載。
+轉換策略偏保守:**凡是無法轉換的部分,絕不會默默丟掉,而是在輸出中保留為 `TODO`,並在報告裡寫明原因。**
 
-## 目前可用的功能
-| 指令 | 說明 |
+## 目前可以使用的功能
+| 指令 | 功能 |
 |---|---|
-| `pl2pl cobol` | COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash。已用 GnuCOBOL 實際建置並執行驗證。 |
-| `pl2pl omp` | 為獨立的 C/C++ 迴圈加上 `#pragma omp parallel for`(含加總歸約)。結果與原程式相同。 |
-| `pl2pl php` | Laravel / Symfony → FastAPI(詳見下文)。已用真實的 FastAPI、SQLite、Jinja2 完整測試。 |
-| `pl2pl web` | 辨識 Java / COBOL / Flask·Django,並交給 java_to、cobol_to、2fastapi、2poem。已用真實檔案驗證。 |
-| `pl2pl cport` | UNIX 的 C → 相容標頭檔+機械式取代+移植指南。已用 gcc 驗證。 |
-| `pl2pl pyhpc` | 為數值型 Python 函式加上 Numba `@njit`;`--mpi` 產生 mpi4py 骨架。Numba 下結果相同。 |
-| `pl2pl kokkos` | 獨立迴圈 → Kokkos(`parallel_for` / `parallel_reduce`)。已用 Kokkos 4.5.01(Serial)建置並執行。 |
-| `pl2pl gpu` | (試作)迴圈 → CUDA 風格 `.cu` / HLSL。僅輸出;在 open-cuda / open-directx 上的執行尚未驗證。 |
-| `pl2pl llm setup` / `llm start` | 啟動內建的 aruaru-llm,並依可用記憶體自動安裝合適的 Qwen2.5 模型。僅驗證了選擇邏輯與 --dry-run。 |
-| `pl2pl doctor` | 透過 open-cpu(內建)顯示 CPU 資訊。 |
+| `pl2pl cobol` | 將 IBM COBOL 加 JCL 轉換成 Linux 上的 GnuCOBOL 加 bash。已用 GnuCOBOL 實際建置並執行驗證。 |
+| `pl2pl omp` | 為彼此獨立的 C/C++ 迴圈加上 `#pragma omp parallel for`(包含加總歸約),結果與原程式相同。 |
+| `pl2pl php` | 將 Laravel / Symfony 轉換成 FastAPI(詳見下文)。已用真實的 FastAPI、SQLite 與 Jinja2 做過端對端測試。 |
+| `pl2pl web` | 自動辨識 Java、COBOL 與 Flask/Django,再交給 java_to、cobol_to、2fastapi 或 2poem 處理。已用真實檔案驗證。 |
+| `pl2pl cport` | 將 UNIX 的 C 程式碼轉成相容標頭檔,並附上機械式取代與移植說明。已用 gcc 驗證。 |
+| `pl2pl pyhpc` | 為數值運算的 Python 函式加上 Numba `@njit`;加上 `--mpi` 還會產生 mpi4py 骨架。在 Numba 下結果一致。 |
+| `pl2pl kokkos` | 將獨立迴圈改寫成 Kokkos(`parallel_for` / `parallel_reduce`)。已用 Kokkos 4.5.01(Serial)建置並執行。 |
+| `pl2pl gpu` | 試作功能:將迴圈轉成 CUDA 風格的 `.cu` 或 HLSL。目前只檢查了產生的輸出,尚未在 open-cuda / open-directx 上執行。 |
+| `pl2pl llm setup` / `llm start` | 啟動內建的 aruaru-llm,並依可用記憶體自動安裝合適的 Qwen2.5 模型。目前只驗證了模型選擇邏輯與 `--dry-run`,實際安裝尚未驗證。 |
+| `pl2pl doctor` | 透過內建的 open-cpu 顯示 CPU 資訊。 |
 
 ## PHP 轉換(`pl2pl php`)
-- **路由**:Laravel 的 `Route::get/post/put/patch/delete/any/resource/apiResource/view`、`prefix` 群組、Symfony 的 `#[Route]`。
-- **函式本體**:簡單的 `return`、多條敘述、`response()->json($x, 201)`、`noContent()`。
-- **Eloquent → SQLAlchemy**(`db.py`、`models.py`):欄位取自 migration 或 `$fillable`,其餘欄位放入 `extra`(JSON)欄;以 `DATABASE_URL` 指定資料庫(預設 SQLite)。
-- **查詢建構器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate`(`?page=N`、與 Laravel 相同的 JSON、Blade 的 `links()`)、`get / first / firstOrFail / count / exists / delete`、`$request->query('k', 預設值)`。
-- **關聯**:`hasMany / hasOne / belongsTo / belongsToMany`(自動產生中介表)、`with`、`whereHas / has / whereDoesntHave / doesntHave`、`attach / detach / sync`。
-- **Blade → Jinja2**:輸出、`@if`、`@foreach`、`@forelse`、`@for`、`@extends/@section/@yield/@include` 等。
-- **中介層 → `Depends`**:`auth`(簡易 Bearer 判斷,**須替換為真正的驗證**)、`guest`、`throttle:N,M`、自訂的「符合條件則拒絕,否則 `return $next($request)`」。
+- **路由**:Laravel 的 `Route::get/post/put/patch/delete/any/resource/apiResource/view`、`prefix` 群組,以及 Symfony 的 `#[Route]`。
+- **函式本體**:單純的 `return`、多行敘述、`response()->json($x, 201)` 與 `noContent()`。
+- **Eloquent → SQLAlchemy**(`db.py`、`models.py`):欄位取自 migration 或 `$fillable`,其餘欄位存入 JSON 型別的 `extra` 欄。以 `DATABASE_URL` 指定資料庫(預設為 SQLite)。
+- **查詢建構器**:`where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`、`paginate / simplePaginate`(讀取 `?page=N`,回傳與 Laravel 相同結構的 JSON,Blade 中可用 `links()`)、`get / first / firstOrFail / count / exists / delete`,以及 `$request->query('k', 預設值)`。
+- **模型關聯**:`hasMany / hasOne / belongsTo / belongsToMany`(自動產生中介表)、`with`(含巢狀的 `with('posts.comments')`)、`whereHas / has / whereDoesntHave / doesntHave`,以及 `attach / detach / sync`。
+- **Blade → Jinja2**:輸出運算式、`@if`、`@foreach`、`@forelse`、`@for`、`@extends/@section/@yield/@include` 等。
+- **中介層 → `Depends`**:`auth`(僅是簡易的 Bearer 檢查,**請換成真正的驗證機制**)、`guest`、`throttle:N,M`,以及「符合條件就拒絕,否則 `return $next($request)`」形式的自訂中介層。
 
-## 規劃中(尚未完成)
-- PHP:巢狀 `with('a.b')`、`morph` 關聯、`cursorPaginate`、Blade 的元件/堆疊/授權指令、在 `$next` 之後處理回應的中介層。
-- 待 COBOL_to 與 Java_to 開發成熟後併入 pl2pl,並刪除原儲存庫(擁有者的指示;刪除無法復原,併入後會再次確認)。
-- 通用中介表示(伺服器端、DB/SQL、畫面端),使 N 個來源與 M 個目標只需 N+M 個零件而非 N×M。
-- 與 aruaru-llm 整合(說明與自然語言翻譯與轉換器分離,轉換器不依賴 LLM)。
-- Kokkos 的 GPU 執行與 `Kokkos::View`;在 open-cuda / open-directx 上執行核心。
-- 在 Linux arm64 與 macOS 的 CI 中執行新的 PHP 範例;從 `docs/LANGUAGES.md` 挑選更多語言組合(不會實作全部組合)。
+## 後續規劃(尚未完成)
+- PHP:`morph` 關聯、`cursorPaginate`、Blade 的元件、堆疊與授權指令,以及在 `$next` 之後處理回應的中介層。
+- 待 COBOL_to 與 Java_to 成熟後併入 pl2pl,並刪除原本的儲存庫。這是擁有者的指示;由於刪除無法復原,併入後會再確認一次。
+- 建立統一的中介表示(伺服器端、資料庫/SQL、畫面端),讓 N 種來源與 M 種目標只需 N+M 個元件,而不是 N×M 個。
+- 串接 aruaru-llm。說明文字與自然語言翻譯會和轉換器分開,轉換器本身不依賴 LLM。
+- Kokkos 的 GPU 執行與 `Kokkos::View`,以及在 open-cuda / open-directx 上執行 kernel。
+- 在 Linux arm64 與 macOS 的 CI 中執行新增的 PHP 範例,並從 `docs/LANGUAGES.md` 再挑選一些語言組合(不會做出全部組合)。
 
-## 注意
-判斷保守:可能有相依或副作用時,**不轉換並說明原因**,不保證效能。僅測試過小型自製範例,尚未在大型真實程式上試驗。
-文件:`docs/DESIGN.md`、`docs/LANGUAGES.md`、`docs/COMBINATIONS.md`。
+## 使用須知
+pl2pl 的判斷偏謹慎:只要某段程式碼可能有相依性或副作用,就**不轉換,並在報告中說明原因**,也不保證效能。目前只測試過小型的手寫範例,尚未在大型實際專案上試過。
+延伸閱讀:`docs/DESIGN.md`、`docs/LANGUAGES.md`、`docs/COMBINATIONS.md`。
