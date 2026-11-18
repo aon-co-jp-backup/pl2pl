@@ -150,6 +150,122 @@ fn eloquent_return(body: &str) -> Option<(String, String)> {
     Some((model.clone(), format!("{model}.{op}({a})")))
 }
 
+/// トップレベルの `;` で文に分ける(文字列・括弧の中は分けない)。
+fn split_stmts(s: &str) -> Vec<String> {
+    let (mut v, mut cur, mut depth, mut q) = (vec![], String::new(), 0i32, None::<char>);
+    for ch in s.chars() {
+        if let Some(qc) = q {
+            cur.push(ch);
+            if ch == qc {
+                q = None;
+            }
+            continue;
+        }
+        match ch {
+            '\'' | '"' => {
+                q = Some(ch);
+                cur.push(ch);
+            }
+            '(' | '[' | '{' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            ')' | ']' | '}' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            ';' if depth == 0 => {
+                v.push(cur.trim().to_string());
+                cur.clear();
+            }
+            _ => cur.push(ch),
+        }
+    }
+    if !cur.trim().is_empty() {
+        v.push(cur.trim().to_string());
+    }
+    v.into_iter().filter(|x| !x.is_empty()).collect()
+}
+
+/// 式を Python へ(`$v`・`$v->f`・`$request->all()/input('k')`・単純な値・配列)。できなければ None。
+fn arg_expr(a: &str) -> Option<String> {
+    let a = a.trim();
+    if a.is_empty() {
+        return Some(String::new());
+    }
+    if a == "$request->all()" {
+        return Some("(payload or {})".into());
+    }
+    if let Some(c) = Regex::new(r#"^\$request->(?:input|get|post)\(\s*['"](\w+)['"]\s*\)$"#).unwrap().captures(a) {
+        return Some(format!("(payload or {{}}).get({:?})", &c[1]));
+    }
+    if let Some(c) = Regex::new(r"^\$(\w+)->(\w+)$").unwrap().captures(a) {
+        return Some(format!("{}[{:?}]", &c[1], &c[2]));
+    }
+    php_value(a)
+}
+
+/// 複数文の本体(Eloquent の取得→更新→保存→返却)を Python の行へ。1文でも分からなければ None(全体を TODO にする)。
+fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool) -> Option<Vec<String>> {
+    let mut vars: HashMap<String, String> = HashMap::new(); // 変数 → モデル
+    let mut lines: Vec<String> = vec![];
+    let mut returned = false;
+    let mut add_model = |m: &str, models: &mut Vec<String>| {
+        if !models.iter().any(|x| x == m) {
+            models.push(m.to_string());
+        }
+    };
+    for st in split_stmts(body) {
+        if returned {
+            return None; // return の後に文がある
+        }
+        if let Some(c) = Regex::new(r"^\$(\w+)\s*=\s*(\w+)::(find|findOrFail|create)\((.*)\)$").unwrap().captures(&st) {
+            let op = if &c[3] == "findOrFail" { "find_or_fail" } else { &c[3] };
+            let a = arg_expr(&c[4])?;
+            add_model(&c[2], models);
+            vars.insert(c[1].to_string(), c[2].to_string());
+            lines.push(format!("{} = {}.{}({})", &c[1], &c[2], op, a));
+        } else if let Some(c) = Regex::new(r"^\$(\w+)->update\((.*)\)$").unwrap().captures(&st) {
+            let model = vars.get(&c[1])?.clone();
+            let a = arg_expr(&c[2])?;
+            lines.push(format!("{} = {}.update({}[\"id\"], {})", &c[1], model, &c[1], a));
+        } else if let Some(c) = Regex::new(r"^\$(\w+)->delete\(\)$").unwrap().captures(&st) {
+            let model = vars.get(&c[1])?.clone();
+            lines.push(format!("{}.destroy({}[\"id\"])", model, &c[1]));
+        } else if let Some(c) = Regex::new(r"^\$(\w+)->save\(\)$").unwrap().captures(&st) {
+            let model = vars.get(&c[1])?.clone();
+            lines.push(format!("{} = {}.update({}[\"id\"], {})", &c[1], model, &c[1], &c[1]));
+        } else if let Some(c) = Regex::new(r"^\$(\w+)->(\w+)\s*=\s*(.+)$").unwrap().captures(&st) {
+            vars.get(&c[1])?;
+            lines.push(format!("{}[{:?}] = {}", &c[1], &c[2], arg_expr(&c[3])?));
+        } else if let Some(c) = Regex::new(r"^\$(\w+)\s*=\s*(.+)$").unwrap().captures(&st) {
+            lines.push(format!("{} = {}", &c[1], arg_expr(&c[2])?));
+        } else if let Some(r) = st.strip_prefix("return") {
+            let r = r.trim();
+            let r = r.trim();
+            if Regex::new(r"^response\(\)->noContent\(\)$").unwrap().is_match(r) {
+                *need_response = true;
+                lines.push("return Response(status_code=204)".into());
+            } else if let Some(c) = Regex::new(r"^(?:response\(\)->json|Response::json)\((.*)\)$").unwrap().captures(r) {
+                let args = split_args(&c[1]);
+                let v = arg_expr(args.first()?)?;
+                if let Some(code) = args.get(1).and_then(|x| x.trim().parse::<u16>().ok()) {
+                    *need_response = true;
+                    lines.push(format!("return JSONResponse({v}, status_code={code})"));
+                } else {
+                    lines.push(format!("return {v}"));
+                }
+            } else {
+                lines.push(format!("return {}", arg_expr(r)?));
+            }
+            returned = true;
+        } else {
+            return None;
+        }
+    }
+    if returned { Some(lines) } else { None }
+}
+
 type Schema = HashMap<String, (String, Vec<(String, &'static str)>)>; // モデル → (テーブル, 列)
 
 fn lower_snake(n: &str) -> String {
@@ -254,6 +370,21 @@ __COLS__    extra = Column(JSON, default=dict)
         if r is None:
             raise HTTPException(status_code=404, detail="__M__ not found")
         return r
+
+    @classmethod
+    def update(cls, id, data):
+        with Session() as s:
+            r = s.get(cls, int(id))
+            if r is None:
+                return None
+            data = dict(data or {})
+            data.pop("id", None)
+            for k in list(data):
+                if k in cls.COLUMNS:
+                    setattr(r, k, data.pop(k))
+            r.extra = {**(r.extra or {}), **data}
+            s.commit()
+            return r.to_dict()
 
     @classmethod
     def destroy(cls, id):
@@ -448,6 +579,7 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
     rep.extend(warn.iter().cloned());
     let mut used: Vec<String> = vec![];
     let mut models: Vec<String> = vec![];
+    let mut need_response = false;
     let mut m = String::from("\"\"\"pl2pl php が生成した FastAPI の骨組み。ルートと型を写し、本体は TODO。\"\"\"\nfrom fastapi import FastAPI\n\napp = FastAPI()\n");
     let path_var = Regex::new(r"\{(\w+)\??\}").unwrap();
     for r in &routes {
@@ -485,7 +617,13 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
                 ctl_body = Some(expr);
             }
         }
+        let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response)) } else { None };
         match r.body.as_ref().or(ctl_body.as_ref()) {
+            None if multi.is_some() => {
+                for l in multi.unwrap() {
+                    m.push_str(&format!("    {l}\n"));
+                }
+            }
             Some(b) => m.push_str(&format!("    return {b}\n")),
             None => {
                 m.push_str(&format!("    # PHP: {} ({} {})\n    raise NotImplementedError(\"TODO(pl2pl): {} を移植する\")\n", r.handler, r.verb.to_uppercase(), r.path, r.handler));
@@ -495,6 +633,9 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
     }
     if !models.is_empty() {
         m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\n\nfrom models import {}\n", models.join(", ")), 1);
+    }
+    if need_response {
+        m = m.replacen("from fastapi import FastAPI\n", "from fastapi import FastAPI, Response\nfrom fastapi.responses import JSONResponse\n", 1);
     }
     for mo in &models {
         let n = schema.get(mo).map(|x| x.1.len()).unwrap_or(0);
@@ -554,5 +695,15 @@ mod tests {
         let out = generate(&files, "fastapi", &mut rep);
         assert!(out[0].1.contains("def user_controller_show(id: int):"));
         assert!(out[0].1.contains("NotImplementedError"));
+    }
+
+    #[test]
+    fn multi_statement_body() {
+        let mut m = vec![];
+        let mut r = false;
+        let l = translate_body("$u = User::findOrFail($id); $u->update($request->all()); return response()->json($u);", &mut m, &mut r).unwrap();
+        assert_eq!(l, vec!["u = User.find_or_fail(id)", "u = User.update(u[\"id\"], (payload or {}))", "return u"]);
+        assert_eq!(m, vec!["User"]);
+        assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r).is_none());
     }
 }

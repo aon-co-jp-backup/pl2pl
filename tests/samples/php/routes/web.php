@@ -11,3 +11,7 @@ Route::prefix('api')->group(function () {
 Route::get('/health', [UserController::class, 'health']);
 Route::get('/echo/{id}', [UserController::class, 'echoId']);
 Route::delete('/users/{id}', [UserController::class, 'destroy']);
+Route::put('/users/{id}', [UserController::class, 'update']);
+Route::post('/users/{id}/rename', [UserController::class, 'rename']);
+Route::delete('/users/{id}/remove', [UserController::class, 'remove']);
+Route::post('/make', [UserController::class, 'make']);
