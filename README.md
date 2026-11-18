@@ -52,7 +52,7 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 - **Blade → Jinja2**(`templates/`): 出力・`@if`・`@foreach`・`@forelse`・`@for`・`@extends/@section/@yield/@include` など。`view()`・`compact`・`->with`・`Route::view` は `TemplateResponse` へ。
 - **ミドルウェア → `Depends`**(`middleware.py`): `auth`(Bearer と環境変数 `API_TOKENS` の簡易判定。**本物の認証へ差し替えること**)、`guest`、`throttle:N,M`(メモリ上の簡易版)、独自ミドルウェアの「条件で拒否 → `return $next($request)`」の形。
 - **リレーション**: `hasMany` / `hasOne` / `belongsTo` / `belongsToMany`(中間表を自動生成)。`$u->posts`、`$p->user`、`$u->posts()->create([...])`、`attach / detach / sync`、`with('posts')`(`with('posts.comments')` のネストも可)、`whereHas('posts', fn($q) => $q->where(...))`、`has('posts')`・`whereDoesntHave`・`doesntHave` に対応。外部キー列が無ければ追加する。
-- **未対応(TODO として報告)**: リレーションのネスト(`with('posts.comments')`)・`morph` 系・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
+- **未対応(TODO として報告)**: `morph` 系・`cursorPaginate`・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
 
 ## 完成予定の機能(未了)
 - PHP: `morph` 系リレーション、`cursorPaginate`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
