@@ -3,7 +3,7 @@
 v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
 PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
-1. PHP: リレーションの残り(`morph` 系)、Blade のコンポーネント・`@can` 系の認可。
+1. PHP: リレーションの残り(`morph` 系)、`@can` 系の認可・クラスベースの Blade コンポーネント。
 2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
@@ -64,3 +64,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記16**: `$r = $next($request); $r->header('K','V'); return $r;` 形の独自ミドルウェアを変換(`Response` を依存で受けてヘッダーを付ける)。ヘッダー追加のみ対応で、ボディの加工は TODO。ルートが `Response` を直接返すときは付かない。実FastAPIの通し試験成功(単体30件)。未対応: `morph` 系・Blade のコンポーネント/スタック/認可系。
 
 **2026-11-19 追記17**: Blade の `@push/@stack`(Jinja2 のブロック。同じスタックへの2回目の `@push` は TODO)・`@auth/@guest`(Authorization ヘッダーの簡易判定)・`@switch/@case/@default`・`@checked/@selected/@disabled`・`@json` を変換。実FastAPIの通し試験成功、単体31件成功。未対応: `morph` 系・Blade のコンポーネント(`@component`・`<x-...>`)・`@can` 系・`@php`。
+
+**2026-11-19 追記18**: Blade の無名コンポーネント(`<x-alert type="error" :title="$h">本文</x-alert>`・自己閉じ・`<x-slot:名前>`/`<x-slot name="..">`・`@props` の既定値)を変換(`{% with %}`+`{% set slot %}`+`{% include "components/…" %}`)。実FastAPIの通し試験成功、単体32件成功。未対応: `morph` 系・`@component`/クラスベースのコンポーネント・`$attributes`・`@can` 系・`@php`。

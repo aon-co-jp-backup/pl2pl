@@ -28,7 +28,7 @@ The converter is deliberately cautious. **Whatever it cannot convert is never dr
 - **Middleware → `Depends`**: `auth` (a simple Bearer check — **replace it with real authentication**), `guest`, `throttle:N,M`, and custom middleware of the form “reject on a condition, otherwise `return $next($request)`”.
 
 ## Planned (not done yet)
-- PHP: `morph` relations, Blade components and `@can`-style authorization, and middleware that rewrites the response body after `$next` (adding headers already works).
+- PHP: `morph` relations, `@can`-style authorization and class-based Blade components (anonymous `<x-...>` components already work), and middleware that rewrites the response body after `$next` (adding headers already works).
 - Merge COBOL_to and Java_to into pl2pl once they are mature, then delete the original repositories. This is the owner's instruction; since deletion cannot be undone, it will be confirmed again after the merge.
 - A shared intermediate representation (server side, DB/SQL, UI side), so N sources and M targets need N+M parts instead of N×M.
 - aruaru-llm integration. Explanations and natural-language translation stay separate from the converters, which never depend on an LLM.

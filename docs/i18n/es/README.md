@@ -28,7 +28,7 @@ El conversor es prudente a propósito. **Lo que no puede convertir nunca se omit
 - **Middleware → `Depends`**: `auth` (una simple comprobación Bearer; **hay que sustituirla por una autenticación real**), `guest`, `throttle:N,M` y middleware propio del tipo «rechazar si se cumple una condición; si no, `return $next($request)`».
 
 ## Previsto (todavía sin hacer)
-- PHP: relaciones `morph`, componentes de Blade y autorización tipo `@can`, y middleware que modifique el cuerpo de la respuesta después de `$next` (añadir cabeceras ya funciona).
+- PHP: relaciones `morph`, autorización tipo `@can` y componentes de Blade basados en clases (los componentes anónimos `<x-...>` ya funcionan), y middleware que modifique el cuerpo de la respuesta después de `$next` (añadir cabeceras ya funciona).
 - Incorporar COBOL_to y Java_to a pl2pl cuando estén maduros y borrar los repositorios originales. Es una indicación del propietario; como borrar no se puede deshacer, se confirmará de nuevo tras la incorporación.
 - Una representación intermedia común (lado servidor, base de datos/SQL, interfaz) para que N orígenes y M destinos necesiten N+M piezas en lugar de N×M.
 - Integración con aruaru-llm. Las explicaciones y la traducción de lenguaje natural siguen separadas de los conversores, que nunca dependen de un LLM.

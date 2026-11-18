@@ -113,4 +113,8 @@ class UserController {
         $data = ['a' => 1];
         return view('extras', compact('n', 'data'));
     }
+    public function comp() {
+        $heading = 'H<1>';
+        return view('comp', compact('heading'));
+    }
 }

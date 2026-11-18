@@ -201,6 +201,79 @@ fn with_pairs(arr: &str) -> Result<String, String> {
     Ok(parts.join(", "))
 }
 
+/// 無名の Blade コンポーネント `<x-alert type="error">本文</x-alert>` → `{% with %}{% set slot %}..{% endset %}{% include %}{% endwith %}`
+fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
+    let attr = Regex::new(r#"(:?)([\w-]+)\s*=\s*"([^"]*)""#).unwrap();
+    let tag = Regex::new(r"(?s)<x-([\w.-]+)((?:\s+[^<>]*?)?)\s*(/>|>)").unwrap();
+    let slot = Regex::new(r#"(?s)<x-slot(?::(\w+)|\s+name="(\w+)")\s*>(.*?)</x-slot(?::\w+)?>"#).unwrap();
+    let mut s = src.to_string();
+    for _ in 0..50 {
+        let Some(m) = tag.captures(&s) else { break };
+        let whole = m.get(0).unwrap();
+        let cname = m[1].to_string();
+        if cname == "slot" {
+            break;
+        }
+        let selfclose = &m[3] == "/>";
+        let mut pairs: Vec<String> = vec![];
+        let mut failed: Option<String> = None;
+        for a in attr.captures_iter(&m[2]) {
+            let key = a[2].replace('-', "_");
+            let val = a[3].trim();
+            let v = if &a[1] == ":" {
+                match jexpr(val) {
+                    Ok(j) => Some(j),
+                    Err(e) => {
+                        failed = Some(e);
+                        None
+                    }
+                }
+            } else if val.starts_with("{{") && val.ends_with("}}") && val.matches("{{").count() == 1 {
+                Some(val[2..val.len() - 2].trim().to_string())
+            } else {
+                Some(format!("{:?}", val))
+            };
+            if let Some(v) = v {
+                pairs.push(format!("{key}={v}"));
+            }
+        }
+        let line = line_of(&s, whole.start());
+        let (start, wend) = (whole.start(), whole.end());
+        let (end, body) = if selfclose {
+            (wend, String::new())
+        } else {
+            let close = format!("</x-{cname}>");
+            match s[wend..].find(&close) {
+                Some(c) => (wend + c + close.len(), s[wend..wend + c].to_string()),
+                None => {
+                    warn.push(format!("{name}:{line} <x-{cname}>: 閉じタグが無い"));
+                    s.replace_range(start..wend, &format!("{{# TODO(pl2pl): <x-{cname}> #}}"));
+                    continue;
+                }
+            }
+        };
+        if let Some(why) = failed {
+            warn.push(format!("{name}:{line} <x-{cname}>: {why}"));
+            s.replace_range(start..end, &format!("{{# TODO(pl2pl): <x-{cname}> #}}"));
+            continue;
+        }
+        let mut sets = String::new();
+        let mut rest = body.clone();
+        for sl in slot.captures_iter(&body) {
+            let n = sl.get(1).or(sl.get(2)).map(|x| x.as_str()).unwrap_or("");
+            sets.push_str(&format!("{{% set {n} %}}{}{{% endset %}}", &sl[3]));
+            rest = rest.replace(sl.get(0).unwrap().as_str(), "");
+        }
+        if !selfclose {
+            sets.push_str(&format!("{{% set slot %}}{}{{% endset %}}", rest.trim()));
+        }
+        let t = format!("components/{}.html", cname.replace('.', "/"));
+        let with = if pairs.is_empty() { String::new() } else { format!("{} ", pairs.join(", ")) };
+        s.replace_range(start..end, &format!("{{% with {with}%}}{sets}{{% include \"{t}\" %}}{{% endwith %}}"));
+    }
+    s
+}
+
 pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
     // 1) コメント・出力
     let s = Regex::new(r"(?s)\{\{--(.*?)--\}\}").unwrap().replace_all(src, "{#$1#}").to_string();
@@ -235,8 +308,9 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
         warn.push(format!("{name}: {e}"));
     }
     // 2) ディレクティブ
+    let s3 = convert_components(&s3, name, warn);
     let known = Regex::new(r"@(\w+)").unwrap();
-    let todo_names = ["php", "endphp", "can", "endcan", "cannot", "endcannot", "once", "endonce", "props", "component", "endcomponent", "slot", "endslot", "livewire", "lang", "error", "enderror", "class", "style", "dd", "dump", "use", "inject", "continue", "while", "endwhile", "env", "endenv", "production", "endproduction", "hasSection", "sectionMissing", "csrf", "method", "vite"];
+    let todo_names = ["php", "endphp", "can", "endcan", "cannot", "endcannot", "once", "endonce", "component", "endcomponent", "slot", "endslot", "livewire", "lang", "error", "enderror", "class", "style", "dd", "dump", "use", "inject", "continue", "while", "endwhile", "env", "endenv", "production", "endproduction", "hasSection", "sectionMissing", "csrf", "method", "vite"];
     let mut out = String::new();
     let mut i = 0;
     let mut stack: Vec<&str> = vec![]; // "forelse" / "other"
@@ -372,6 +446,17 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
                 out.push_str(&format!("{{% block {} %}}{def}{{% endblock %}}", unquote(parts.first().map(|x| x.as_str()).unwrap_or(""))));
             }
             "parent" => out.push_str("{{ super() }}"),
+            "props" => {
+                let inner = arg.trim().strip_prefix('[').and_then(|x| x.strip_suffix(']')).unwrap_or("");
+                for it in split_top_commas(inner) {
+                    if let Some((k, v)) = it.split_once("=>") {
+                        match jexpr(v) {
+                            Ok(j) => out.push_str(&format!("{{% set {k} = {k}|default({j}) %}}", k = unquote(k))),
+                            Err(why) => fail!(&why),
+                        }
+                    }
+                }
+            }
             "stack" => out.push_str(&format!("{{% block stack_{} %}}{{% endblock %}}", unquote(&arg))),
             "push" | "prepend" => {
                 let n = unquote(&arg);
@@ -449,6 +534,16 @@ mod tests {
         let mut w2 = vec![];
         convert("@push('a')x@endpush @push('a')y@endpush", "t", &mut w2);
         assert!(w2.iter().any(|x| x.contains("2回目")), "{w2:?}");
+    }
+
+    #[test]
+    fn components() {
+        let mut w = vec![];
+        let o = convert("<x-alert type=\"error\" :n=\"$count\" label=\"{{ $l }}\">Hi <b>x</b></x-alert><x-forms.input name=\"a\" />", "t", &mut w);
+        assert!(o.contains("{% with type=\"error\", n=count, label=l %}{% set slot %}Hi <b>x</b>{% endset %}{% include \"components/alert.html\" %}{% endwith %}"), "{o}");
+        assert!(o.contains("{% with name=\"a\" %}{% include \"components/forms/input.html\" %}{% endwith %}"), "{o}");
+        let p = convert("@props(['type' => 'info'])<p class=\"{{ $type }}\">{{ $slot }}</p>", "c", &mut w);
+        assert!(p.contains("{% set type = type|default('info') %}") && p.contains("{{ slot }}"), "{p}");
     }
 
     #[test]

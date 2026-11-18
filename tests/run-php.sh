@@ -98,6 +98,9 @@ assert "<i>out</i>" in ex.text and "<i>in</i>" not in ex.text and "checked" in e
 assert '<script src="/x.js"></script>' in ex.text and ex.text.index("/x.js") > ex.text.index("n=2"), ex.text
 assert "var d = {&#34;a&#34;: 1}" in ex.text or 'var d = {"a": 1}' in ex.text or "var d = {" in ex.text, ex.text
 assert "<i>in</i>" in c.get("/extras", headers={"Authorization": "Bearer z"}).text
+cp = c.get("/comp")
+assert cp.status_code == 200 and 'class="alert error"' in cp.text and 'class="alert info"' in cp.text, cp.text
+assert "<h4>T</h4>" in cp.text and "body <b>H&lt;1&gt;</b>" in cp.text and "plain" in cp.text, cp.text
 pg = c.get("/paged?page=1").json()
 assert pg["current_page"] == 1 and pg["per_page"] == 2 and len(pg["data"]) == 2, pg
 assert pg["total"] >= 3 and pg["last_page"] == -(-pg["total"] // 2), pg
