@@ -42,4 +42,16 @@ class UserController {
     public function tagged() {
         return User::where('tag', 'vip')->get();
     }
+    public function people() {
+        $people = User::where('age', '>', 0)->get();
+        return view('people', ['heading' => 'All', 'people' => $people]);
+    }
+    public function peopleCompact() {
+        $heading = 'Compact';
+        $people = [];
+        return view('people', compact('heading', 'people'));
+    }
+    public function peopleWith() {
+        return view('people')->with('heading', 'With')->with('people', []);
+    }
 }

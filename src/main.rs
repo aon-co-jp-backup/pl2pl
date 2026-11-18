@@ -6,6 +6,7 @@ mod pyhpc;
 mod llm;
 mod loops;
 mod omp;
+mod blade;
 mod php;
 mod web;
 mod util;

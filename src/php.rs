@@ -10,6 +10,7 @@ pub struct Route {
     pub class: String,
     pub method: String,
     pub body: Option<String>, // 単純なクロージャの翻訳済み return 式
+    pub raw: Option<String>,  // クロージャ本体の PHP 原文(複数文の変換用)
     pub src: String,
     pub line: usize,
 }
@@ -206,7 +207,7 @@ fn arg_expr(a: &str) -> Option<String> {
 }
 
 /// 複数文の本体(Eloquent の取得→更新→保存→返却)を Python の行へ。1文でも分からなければ None(全体を TODO にする)。
-fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool) -> Option<Vec<String>> {
+fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool, need_tpl: &mut bool) -> Option<Vec<String>> {
     let mut vars: HashMap<String, String> = HashMap::new(); // 変数 → モデル
     let mut lines: Vec<String> = vec![];
     let mut returned = false;
@@ -261,7 +262,10 @@ fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool
         } else if let Some(r) = st.strip_prefix("return") {
             let r = r.trim();
             let r = r.trim();
-            if Regex::new(r"^response\(\)->noContent\(\)$").unwrap().is_match(r) {
+            if let Some(e) = view_expr(r) {
+                *need_tpl = true;
+                lines.push(format!("return {e}"));
+            } else if Regex::new(r"^response\(\)->noContent\(\)$").unwrap().is_match(r) {
                 *need_response = true;
                 lines.push("return Response(status_code=204)".into());
             } else if let Some(c) = Regex::new(r"^(?:response\(\)->json|Response::json)\((.*)\)$").unwrap().captures(r) {
@@ -395,6 +399,46 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
         return None;
     }
     Some((model, py, one))
+}
+
+/// `view('a.b', [...])` / `view('a.b', compact('x'))` / `->with(...)` → `templates.TemplateResponse(request, "a/b.html", {...})`。
+fn view_expr(r: &str) -> Option<String> {
+    let segs = split_chain(r.trim().trim_end_matches(';'));
+    let first = Regex::new(r"^view\((.*)\)$").unwrap().captures(&segs[0])?;
+    let args = split_args(&first[1]);
+    let name = crate::blade::template_name(&unq(args.first()?));
+    let mut pairs: Vec<String> = vec![];
+    let add_array = |arr: &str, pairs: &mut Vec<String>| -> Option<()> {
+        let a = arr.trim();
+        if let Some(c) = Regex::new(r"^compact\((.*)\)$").unwrap().captures(a) {
+            for n in split_args(&c[1]) {
+                let n = unq(&n);
+                pairs.push(format!("{n:?}: {n}"));
+            }
+            return Some(());
+        }
+        let inner = a.strip_prefix('[').and_then(|x| x.strip_suffix(']'))?;
+        for it in split_args(inner) {
+            let (k, v) = it.split_once("=>")?;
+            pairs.push(format!("{:?}: {}", unq(k), arg_expr(v)?));
+        }
+        Some(())
+    };
+    if let Some(a) = args.get(1) {
+        add_array(a, &mut pairs)?;
+    }
+    for seg in &segs[1..] {
+        let c = Regex::new(r"^with\((.*)\)$").unwrap().captures(seg)?;
+        let wa = split_args(&c[1]);
+        if wa.len() == 2 {
+            pairs.push(format!("{:?}: {}", unq(&wa[0]), arg_expr(&wa[1])?));
+        } else if wa.len() == 1 {
+            add_array(&wa[0], &mut pairs)?;
+        } else {
+            return None;
+        }
+    }
+    Some(format!("templates.TemplateResponse(request, {:?}, {{{}}})", name, pairs.join(", ")))
 }
 
 type Schema = HashMap<String, (String, Vec<(String, &'static str)>)>; // モデル → (テーブル, 列)
@@ -726,7 +770,7 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
             masked.replace_range(m.get(0).unwrap().start()..close + 1, &blank);
         }
     }
-    let re = Regex::new(r"Route::(get|post|put|patch|delete|any|resource|apiResource)\(").unwrap();
+    let re = Regex::new(r"Route::(get|post|put|patch|delete|any|resource|apiResource|view)\(").unwrap();
     for m in re.captures_iter(&masked) {
         let open = m.get(0).unwrap().end() - 1;
         let Some(close) = matching(&masked, open, '(', ')') else { continue };
@@ -738,6 +782,12 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
         }
         let path = join_path(prefix, &unq(&args[0]));
         let handler = args.get(1).cloned().unwrap_or_default();
+        if verb == "view" {
+            if args.len() >= 2 {
+                out.push(Route { verb: "get".into(), path: path.clone(), handler: "view".into(), class: String::new(), method: "view".into(), body: None, raw: Some(format!("return view({});", args[1..].join(", "))), src: String::new(), line });
+            }
+            continue;
+        }
         if verb == "resource" || verb == "apiResource" {
             let class = Regex::new(r"(\w+)::class").unwrap().captures(&handler).map(|c| c[1].to_string()).unwrap_or_else(|| unq(&handler).split('@').next().unwrap_or("").to_string());
             let single = path.rsplit('/').next().unwrap_or("item").trim_end_matches('s').to_string();
@@ -747,11 +797,12 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
                 warn.push(format!("{name}:{line} Route::resource の create/edit(HTML フォーム)は変換していません"));
             }
             for (v, p, meth) in rs.drain(..) {
-                out.push(Route { verb: v.into(), path: p, handler: format!("{class}@{meth}"), class: class.clone(), method: meth.into(), body: None, src: String::new(), line });
+                out.push(Route { verb: v.into(), path: p, handler: format!("{class}@{meth}"), class: class.clone(), method: meth.into(), body: None, raw: None, src: String::new(), line });
             }
             continue;
         }
         let verbs: Vec<&str> = if verb == "any" { vec!["get", "post", "put", "patch", "delete"] } else { vec![verb.as_str()] };
+        let mut raw_closure: Option<String> = None;
         let (class, method, body, label) = if let Some(c) = Regex::new(r"^\[\s*([\w\\]+)::class\s*,\s*['\x22](\w+)['\x22]\s*\]$").unwrap().captures(&handler) {
             let cls = c[1].rsplit('\\').next().unwrap().to_string();
             (cls.clone(), c[2].to_string(), None, format!("{cls}@{}", &c[2]))
@@ -761,13 +812,14 @@ fn parse_laravel(src: &str, prefix: &str, line0: usize, out: &mut Vec<Route>, wa
         } else if handler.starts_with("function") || handler.starts_with("fn") {
             let body = if let Some(i) = handler.find('{') { handler[i + 1..handler.rfind('}').unwrap_or(handler.len())].to_string() } else { handler.split_once("=>").map(|x| format!("return {};", x.1.trim())).unwrap_or_default() };
             let sv = simple_return(&body);
+            raw_closure = Some(body.clone());
             (String::new(), "closure".into(), sv, "closure".to_string())
         } else {
             warn.push(format!("{name}:{line} ハンドラの形を解釈できません: {}", handler.chars().take(40).collect::<String>()));
             continue;
         };
         for v in verbs {
-            out.push(Route { verb: v.into(), path: path.clone(), handler: label.clone(), class: class.clone(), method: method.clone(), body: body.clone(), src: handler.chars().take(80).collect(), line });
+            out.push(Route { verb: v.into(), path: path.clone(), handler: label.clone(), class: class.clone(), method: method.clone(), body: body.clone(), raw: raw_closure.clone(), src: handler.chars().take(80).collect(), line });
         }
     }
 }
@@ -790,7 +842,7 @@ fn parse_symfony(src: &str, name: &str, out: &mut Vec<Route>, warn: &mut Vec<Str
                 warn.push(format!("{name}:{line} 未対応の動詞 {v}"));
                 continue;
             }
-            out.push(Route { verb: v, path: join_path(&prefix, &a[1]), handler: format!("{}@{}", &cm[1], &f[1]), class: cm[1].to_string(), method: f[1].to_string(), body: None, src: String::new(), line });
+            out.push(Route { verb: v, path: join_path(&prefix, &a[1]), handler: format!("{}@{}", &cm[1], &f[1]), class: cm[1].to_string(), method: f[1].to_string(), body: None, raw: None, src: String::new(), line });
         }
     }
 }
@@ -817,7 +869,9 @@ fn py_type(t: &str) -> &'static str {
     }
 }
 
-pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>) -> Vec<(String, String)> {
+pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<String>) -> Vec<(String, String)> {
+    let (blade_files, files): (Vec<(String, String)>, Vec<(String, String)>) = all_files.iter().cloned().partition(|(n, _)| n.ends_with(".blade.php"));
+    let files = &files[..];
     let mut warn = vec![];
     let routes = extract(files, &mut warn);
     let sigs = collect_controllers(files);
@@ -827,6 +881,7 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
     let mut used: Vec<String> = vec![];
     let mut models: Vec<String> = vec![];
     let mut need_response = false;
+    let mut need_tpl = false;
     let mut m = String::from("\"\"\"pl2pl php が生成した FastAPI の骨組み。ルートと型を写し、本体は TODO。\"\"\"\nfrom fastapi import FastAPI\n\napp = FastAPI()\n");
     let path_var = Regex::new(r"\{(\w+)\??\}").unwrap();
     for r in &routes {
@@ -853,8 +908,8 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
         if matches!(r.verb.as_str(), "post" | "put" | "patch") {
             params.push("payload: dict | None = None".into());
         }
-        m.push_str(&format!("\n\n@app.{}({:?})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
-        let raw_body = bodies.get(&(r.class.clone(), r.method.clone()));
+        let mut body_txt = String::new();
+        let raw_body = bodies.get(&(r.class.clone(), r.method.clone())).or(r.raw.as_ref());
         let mut ctl_body = if r.body.is_none() { raw_body.and_then(|b| simple_return(b)) } else { None };
         if r.body.is_none() && ctl_body.is_none() {
             if let Some((model, expr)) = raw_body.and_then(|b| eloquent_return(b)) {
@@ -864,19 +919,29 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
                 ctl_body = Some(expr);
             }
         }
-        let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response)) } else { None };
+        let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response, &mut need_tpl)) } else { None };
         match r.body.as_ref().or(ctl_body.as_ref()) {
             None if multi.is_some() => {
                 for l in multi.unwrap() {
-                    m.push_str(&format!("    {l}\n"));
+                    body_txt.push_str(&format!("    {l}\n"));
                 }
             }
-            Some(b) => m.push_str(&format!("    return {b}\n")),
+            Some(b) => body_txt.push_str(&format!("    return {b}\n")),
             None => {
-                m.push_str(&format!("    # PHP: {} ({} {})\n    raise NotImplementedError(\"TODO(pl2pl): {} を移植する\")\n", r.handler, r.verb.to_uppercase(), r.path, r.handler));
+                body_txt.push_str(&format!("    # PHP: {} ({} {})\n    raise NotImplementedError(\"TODO(pl2pl): {} を移植する\")\n", r.handler, r.verb.to_uppercase(), r.path, r.handler));
                 rep.push(format!("{}:{} {} {} の本体は未変換(TODO)", "routes", r.line, r.verb.to_uppercase(), r.path));
             }
         }
+        if body_txt.contains("TemplateResponse(request,") {
+            params.insert(0, "request: Request".into());
+        }
+        m.push_str(&format!("\n\n@app.{}({:?})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
+        m.push_str(&body_txt);
+    }
+    let has_tpl = need_tpl || !blade_files.is_empty();
+    if has_tpl {
+        m = m.replacen("from fastapi import FastAPI\n", "from fastapi import FastAPI\nfrom fastapi import Request\nfrom fastapi.templating import Jinja2Templates\n", 1);
+        m = m.replacen("app = FastAPI()\n", "app = FastAPI()\ntemplates = Jinja2Templates(directory=\"templates\")\n", 1);
     }
     if !models.is_empty() {
         m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\n\nfrom models import {}\n", models.join(", ")), 1);
@@ -897,11 +962,19 @@ pub fn generate(files: &[(String, String)], target: &str, rep: &mut Vec<String>)
         outf.push(("models.py".to_string(), models_py(&models, &schema)));
         outf[1].1 = "fastapi\nuvicorn\nsqlalchemy\n".to_string();
     }
+    if has_tpl {
+        for (n, src) in &blade_files {
+            let t = crate::blade::convert(src, n, rep);
+            outf.push((format!("templates/{}", crate::blade::out_path(n)), t));
+        }
+        rep.push(format!("Blade {} 枚を Jinja2(templates/)へ変換(@php・@auth・@can・@push 等は TODO として残し、上のレポートに列挙)", blade_files.len()));
+        outf[1].1 = format!("{}jinja2\n", outf[1].1);
+    }
     if target == "mfastapi" {
         outf.push(("run_mfastapi.py".to_string(), "import mfastapi\nfrom main import app\n\nmfastapi.accelerate(app)\n\nif __name__ == \"__main__\":\n    import uvicorn\n    uvicorn.run(app, host=\"127.0.0.1\", port=8000)\n".to_string()));
         outf[1].1 = format!("{}mfastapi\n", outf[1].1);
     }
-    rep.push(format!("ルート {} 本を FastAPI へ写しました(PHP の本体・ミドルウェア・Eloquent・Blade は未変換)", routes.len()));
+    rep.push(format!("ルート {} 本を FastAPI へ写しました(ミドルウェアと、変換できない文を含む本体は TODO として報告)", routes.len()));
     outf
 }
 
@@ -948,10 +1021,11 @@ mod tests {
     fn multi_statement_body() {
         let mut m = vec![];
         let mut r = false;
-        let l = translate_body("$u = User::findOrFail($id); $u->update($request->all()); return response()->json($u);", &mut m, &mut r).unwrap();
+        let mut t = false;
+        let l = translate_body("$u = User::findOrFail($id); $u->update($request->all()); return response()->json($u);", &mut m, &mut r, &mut t).unwrap();
         assert_eq!(l, vec!["u = User.find_or_fail(id)", "u = User.update(u[\"id\"], (payload or {}))", "return u"]);
         assert_eq!(m, vec!["User"]);
-        assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r).is_none());
+        assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r, &mut t).is_none());
     }
 
     #[test]

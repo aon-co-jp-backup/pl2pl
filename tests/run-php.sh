@@ -34,6 +34,13 @@ assert c.get("/named").json()["age"] == 30
 assert [u["name"] for u in c.get("/many").json()] == ["zed", "kid"], c.get("/many").text
 assert c.get("/total").json()["n"] >= 4
 assert sorted(u["name"] for u in c.get("/tagged").json()) == ["amy", "zed"]
+h = c.get("/people").text
+assert "<title>People</title>" in h and "<h1>All</h1>" in h and "amy (20)" in h and "vip" in h and "<small>many</small>" in h, h
+assert "<h1>Compact</h1>" in c.get("/people-compact").text and "nobody" in c.get("/people-compact").text
+assert "<h1>With</h1>" in c.get("/people-with").text and "<small>few</small>" in c.get("/people-with").text
+ab = c.get("/about").text
+assert "About us &lt;b&gt;" in ab and "user@example.com" in ab, ab
+assert "About us" in c.get("/welcome").text
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 print("php e2e OK", len(paths))

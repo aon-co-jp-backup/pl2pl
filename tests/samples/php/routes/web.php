@@ -20,3 +20,8 @@ Route::get('/named', [UserController::class, 'named']);
 Route::get('/many', [UserController::class, 'many']);
 Route::get('/total', [UserController::class, 'total']);
 Route::get('/tagged', [UserController::class, 'tagged']);
+Route::get('/people', [UserController::class, 'people']);
+Route::get('/people-compact', [UserController::class, 'peopleCompact']);
+Route::get('/people-with', [UserController::class, 'peopleWith']);
+Route::view('/about', 'about');
+Route::get('/welcome', function () { return view('about'); });
