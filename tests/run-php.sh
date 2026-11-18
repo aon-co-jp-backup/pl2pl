@@ -56,6 +56,20 @@ assert r3.status_code == 429 and "Retry-After" in r3.headers, r3.text
 assert c.get("/after").json() == "x"
 assert c.get("/guestonly").json() == "g"
 assert c.get("/guestonly", headers=ok, follow_redirects=False).status_code == 302
+uid = c.post("/users", json={"name": "rel", "age": 40}).json()["id"]
+p1 = c.post(f"/users/{uid}/posts", json={"title": "t1", "published": True})
+assert p1.status_code == 201 and p1.json()["user_id"] == uid, p1.text
+c.post(f"/users/{uid}/posts", json={"title": "t2", "published": False})
+assert [p["title"] for p in c.get(f"/users/{uid}/posts").json()] == ["t1", "t2"]
+assert c.get(f"/posts/{p1.json()['id']}/author").json()["name"] == "rel"
+wp = [x for x in c.get("/with-posts").json() if x["id"] == uid][0]
+assert len(wp["posts"]) == 2, wp
+assert uid in [x["id"] for x in c.get("/published-authors").json()]
+role = c.post("/roles", json={"name": "admin"}).json()
+rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
+assert [x["name"] for x in rr] == ["admin"], rr
+rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
+assert len(rr) == 1, rr
 paths = {r.path for r in app.routes}
 assert "/users/{id}" in paths and "/api/items/{item}" in paths, paths
 print("php e2e OK", len(paths))

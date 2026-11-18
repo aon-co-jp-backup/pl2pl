@@ -101,6 +101,9 @@ pub fn snake(s: &str) -> String {
 /// 単純な PHP の値を Python へ(文字列・数・真偽・平らな配列)。できなければ None。
 pub(crate) fn php_value(s: &str) -> Option<String> {
     let s = s.trim().trim_end_matches(';').trim();
+    if let Some(i) = s.strip_prefix("@py(").and_then(|x| x.strip_suffix(')')) {
+        return Some(i.to_string()); // translate_body が差し込んだ Python 式
+    }
     if (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2) || (s.starts_with('"') && s.ends_with('"') && s.len() >= 2 && !s.contains('$')) {
         return Some(format!("{:?}", &s[1..s.len() - 1]));
     }
@@ -208,7 +211,7 @@ fn arg_expr(a: &str) -> Option<String> {
 }
 
 /// 複数文の本体(Eloquent の取得→更新→保存→返却)を Python の行へ。1文でも分からなければ None(全体を TODO にする)。
-fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool, need_tpl: &mut bool) -> Option<Vec<String>> {
+fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool, need_tpl: &mut bool, rels: &Rels) -> Option<Vec<String>> {
     let mut vars: HashMap<String, String> = HashMap::new(); // 変数 → モデル
     let mut lines: Vec<String> = vec![];
     let mut returned = false;
@@ -220,6 +223,33 @@ fn translate_body(body: &str, models: &mut Vec<String>, need_response: &mut bool
     for st in split_stmts(body) {
         if returned {
             return None; // return の後に文がある
+        }
+        let mut st = st;
+        for (v, model) in &vars {
+            for r in rels.get(model).into_iter().flatten() {
+                st = subst_rel(&st, v, model, &r.name);
+            }
+        }
+        let st = st;
+        let assign_rel = Regex::new(r"^\$(\w+)\s*=\s*(.+)$").unwrap().captures(&st).and_then(|c| rel_call(c[2].trim(), &vars, rels).map(|x| (c[1].to_string(), x)));
+        if let Some((v, (py, result))) = assign_rel {
+            if let Some(m) = result {
+                add_model(&m, models);
+                vars.insert(v.clone(), m);
+            }
+            lines.push(format!("{v} = {py}"));
+            continue;
+        }
+        if let Some((py, _)) = rel_call(&st, &vars, rels) {
+            lines.push(py);
+            continue;
+        }
+        if let Some(r) = st.strip_prefix("return") {
+            if let Some((py, _)) = rel_call(r.trim(), &vars, rels) {
+                lines.push(format!("return {py}"));
+                returned = true;
+                continue;
+            }
         }
         if let Some(c) = Regex::new(r"^\$(\w+)\s*=\s*(.+)$").unwrap().captures(&st) {
             if let Some((model, py, one)) = query_expr(&c[2]) {
@@ -346,13 +376,24 @@ fn query_expr(expr: &str) -> Option<(String, String, bool)> {
         let c = call.captures(&seg)?;
         let (name, raw) = (c[1].to_string(), c[2].to_string());
         let args: Vec<String> = if raw.trim().is_empty() { vec![] } else { split_args(&raw) };
-        let a: Option<Vec<String>> = args.iter().map(|x| arg_expr(x)).collect();
-        let a = a?;
         if terminal {
             return None; // 終端(get/first/...)の後に続きがある
         }
+        if name == "whereHas" || name == "has" {
+            let rel = unq(args.first()?);
+            let conds = match args.get(1) {
+                None => "[]".to_string(),
+                Some(c) => has_conds(c)?,
+            };
+            py.push_str(&format!(".where_has({rel:?}, {conds})"));
+            first = false;
+            continue;
+        }
+        let a: Option<Vec<String>> = args.iter().map(|x| arg_expr(x)).collect();
+        let a = a?;
         let m = match (name.as_str(), a.len()) {
             ("query", 0) if first => continue,
+            ("with", 1) => format!(".with_({})", a[0]),
             ("where", 2) => format!(".where({}, \"=\", {})", a[0], a[1]),
             ("where", 3) => format!(".where({}, {}, {})", a[0], a[1], a[2]),
             ("orWhere", 2) => format!(".or_where({}, \"=\", {})", a[0], a[1]),
@@ -440,6 +481,146 @@ fn view_expr(r: &str) -> Option<String> {
         }
     }
     Some(format!("templates.TemplateResponse(request, {:?}, {{{}}})", name, pairs.join(", ")))
+}
+
+#[derive(Clone, Debug)]
+pub struct Rel {
+    name: String,
+    kind: String, // hasMany / hasOne / belongsTo / belongsToMany
+    related: String,
+    fk: String,       // hasMany/hasOne: 相手側の列、belongsTo: 自分側の列、belongsToMany: 中間表の自分側の列
+    other_fk: String, // belongsToMany: 中間表の相手側の列
+    pivot: String,
+}
+type Rels = HashMap<String, Vec<Rel>>;
+
+fn collect_relations(files: &[(String, String)]) -> Rels {
+    let mut out = Rels::new();
+    let cls = Regex::new(r"class\s+(\w+)\s+extends\s+(?:Model|Authenticatable|\w*Model)\b").unwrap();
+    let f = Regex::new(r"function\s+(\w+)\s*\(\s*\)\s*(?::\s*[\w\\?|]+\s*)?\{\s*return\s+\$this->(hasMany|hasOne|belongsTo|belongsToMany)\(([^;]*)\)\s*;\s*\}").unwrap();
+    let cr = Regex::new(r"([\w\\]+)::class").unwrap();
+    for (_, src) in files {
+        let Some(c) = cls.captures(src) else { continue };
+        let owner = c[1].to_string();
+        for m in f.captures_iter(src) {
+            let args = split_args(&m[3]);
+            let Some(related) = args.first().and_then(|a| cr.captures(a)).map(|x| x[1].rsplit('\\').next().unwrap_or("").to_string()) else { continue };
+            let arg = |i: usize| args.get(i).map(|a| unq(a)).filter(|a| !a.is_empty());
+            let kind = m[2].to_string();
+            let name = m[1].to_string();
+            let (fk, other_fk, pivot) = match kind.as_str() {
+                "belongsTo" => (arg(1).unwrap_or_else(|| format!("{}_id", lower_snake(&name))), String::new(), String::new()),
+                "belongsToMany" => {
+                    let mut names = [lower_snake(&owner), lower_snake(&related)];
+                    names.sort();
+                    (arg(2).unwrap_or_else(|| format!("{}_id", lower_snake(&owner))), arg(3).unwrap_or_else(|| format!("{}_id", lower_snake(&related))), arg(1).unwrap_or_else(|| names.join("_")))
+                }
+                _ => (arg(1).unwrap_or_else(|| format!("{}_id", lower_snake(&owner))), String::new(), String::new()),
+            };
+            out.entry(owner.clone()).or_default().push(Rel { name, kind, related, fk, other_fk, pivot });
+        }
+    }
+    out
+}
+
+/// リレーションが使う外部キー列がスキーマに無ければ足す(SQL で絞れるように実列にする)。
+fn apply_relations(schema: &mut Schema, rels: &Rels) {
+    for (owner, list) in rels {
+        for r in list {
+            let target = match r.kind.as_str() {
+                "hasMany" | "hasOne" => &r.related,
+                "belongsTo" => owner,
+                _ => continue,
+            };
+            if let Some((_, cols)) = schema.get_mut(target) {
+                if !cols.iter().any(|(n, _)| *n == r.fk) {
+                    cols.push((r.fk.clone(), "Integer"));
+                }
+            }
+        }
+    }
+}
+
+fn rel_methods(r: &Rel) -> String {
+    let (n, rel, fk) = (&r.name, &r.related, &r.fk);
+    match r.kind.as_str() {
+        "hasMany" | "hasOne" => {
+            let get = if r.kind == "hasMany" { "get" } else { "first" };
+            format!("\n    @classmethod\n    def {n}(cls, row):\n        return {rel}.query().where(\"{fk}\", \"=\", row[\"id\"]).{get}()\n\n    @classmethod\n    def {n}_create(cls, row, data):\n        return {rel}.create({{**(data or {{}}), \"{fk}\": row[\"id\"]}})\n")
+        }
+        "belongsTo" => format!("\n    @classmethod\n    def {n}(cls, row):\n        v = row.get(\"{fk}\")\n        return None if v is None else {rel}.find(v)\n"),
+        _ => {
+            let (p, o) = (&r.pivot, &r.other_fk);
+            format!("\n    @classmethod\n    def {n}(cls, row):\n        with Session() as s:\n            ids = [x[0] for x in s.execute(select({p}.c.{o}).where({p}.c.{fk} == row[\"id\"]))]\n        return [x for x in ({rel}.find(i) for i in ids) if x]\n\n    @classmethod\n    def {n}_attach(cls, row, ids):\n        ids = ids if isinstance(ids, (list, tuple)) else [ids]\n        have = {{x[\"id\"] for x in cls.{n}(row)}}\n        with Session() as s:\n            for i in ids:\n                if i is not None and int(i) not in have:\n                    s.execute({p}.insert().values({{\"{fk}\": row[\"id\"], \"{o}\": int(i)}}))\n            s.commit()\n\n    @classmethod\n    def {n}_detach(cls, row, ids=None):\n        with Session() as s:\n            q = {p}.delete().where({p}.c.{fk} == row[\"id\"])\n            if ids is not None:\n                ids = ids if isinstance(ids, (list, tuple)) else [ids]\n                q = q.where({p}.c.{o}.in_([int(i) for i in ids]))\n            s.execute(q)\n            s.commit()\n\n    @classmethod\n    def {n}_sync(cls, row, ids):\n        cls.{n}_detach(row)\n        cls.{n}_attach(row, ids)\n")
+        }
+    }
+}
+
+/// `function ($q) { $q->where('a', 1); }` / `fn($q) => $q->where(..)` → `[("a", "=", 1)]`
+fn has_conds(c: &str) -> Option<String> {
+    let c = c.trim();
+    let body = if c.starts_with("fn") {
+        c[c.find("=>")? + 2..].to_string()
+    } else if c.starts_with("function") {
+        let o = c.find('{')?;
+        let cl = matching(c, o, '{', '}')?;
+        c[o + 1..cl].to_string()
+    } else {
+        return None;
+    };
+    let st = body.trim().trim_end_matches(';').trim();
+    let st = st.strip_prefix("return").map(|x| x.trim()).unwrap_or(st);
+    let segs = split_chain(st);
+    if !Regex::new(r"^\$\w+$").unwrap().is_match(&segs[0]) {
+        return None;
+    }
+    let mut out = vec![];
+    for seg in &segs[1..] {
+        let c = Regex::new(r"^where\((.*)\)$").unwrap().captures(seg)?;
+        let a: Option<Vec<String>> = split_args(&c[1]).iter().map(|x| arg_expr(x)).collect();
+        let a = a?;
+        match a.len() {
+            2 => out.push(format!("({}, \"=\", {})", a[0], a[1])),
+            3 => out.push(format!("({}, {}, {})", a[0], a[1], a[2])),
+            _ => return None,
+        }
+    }
+    Some(format!("[{}]", out.join(", ")))
+}
+
+/// 変数のリレーション呼び出し(`$u->posts()->create(..)` / `->attach(..)` など)→ (Python の式, 結果のモデル)
+fn rel_call(st: &str, vars: &HashMap<String, String>, rels: &Rels) -> Option<(String, Option<String>)> {
+    let c = Regex::new(r"^\$(\w+)->(\w+)\(\)->(create|attach|detach|sync)\((.*)\)$").unwrap().captures(st)?;
+    let model = vars.get(&c[1])?;
+    let r = rels.get(model)?.iter().find(|r| r.name == c[2])?;
+    let ok = match &c[3] {
+        "create" => r.kind == "hasMany" || r.kind == "hasOne",
+        _ => r.kind == "belongsToMany",
+    };
+    if !ok {
+        return None;
+    }
+    let a = arg_expr(&c[4])?;
+    let a = if a.is_empty() { "None".to_string() } else { a };
+    let result = if &c[3] == "create" { Some(r.related.clone()) } else { None };
+    Some((format!("{model}.{}_{}({}, {a})", r.name, &c[3], &c[1]), result))
+}
+
+/// `$var->rel`(括弧なし)→ `@py(Model.rel(var))`
+fn subst_rel(st: &str, var: &str, model: &str, rel: &str) -> String {
+    let re = Regex::new(&format!(r"\${}->{}\b", regex::escape(var), regex::escape(rel))).unwrap();
+    let mut out = String::new();
+    let mut last = 0;
+    for m in re.find_iter(st) {
+        if st[m.end()..].trim_start().starts_with('(') {
+            continue;
+        }
+        out.push_str(&st[last..m.start()]);
+        out.push_str(&format!("@py({model}.{rel}({var}))"));
+        last = m.end();
+    }
+    out.push_str(&st[last..]);
+    out
 }
 
 type Schema = HashMap<String, (String, Vec<(String, &'static str)>)>; // モデル → (テーブル, 列)
@@ -584,7 +765,7 @@ __COLS__    extra = Column(JSON, default=dict)
             s.add(row)
             s.commit()
             return row.to_dict()
-"##;
+__RELS__"##;
 
 const QUERY_PY: &str = r##"
 
@@ -615,6 +796,22 @@ class Query:
         self.conds = []
         self.orders = []
         self._limit = None
+        self._with = []
+        self.has = []
+
+    def with_(self, rels):
+        self._with += [rels] if isinstance(rels, str) else list(rels)
+        return self
+
+    def where_has(self, rel, conds=None):
+        self.has.append((rel, conds or []))
+        return self
+
+    def _decorate(self, rows):
+        for rel in self._with:
+            for r in rows:
+                r[rel] = getattr(self.cls, rel)(r)
+        return rows
 
     def where(self, col, op, val=None):
         self.conds.append(("and", col, op, val))
@@ -637,7 +834,7 @@ class Query:
 
     def get(self):
         c = self.cls
-        use_sql = all(k == "and" and self._real(col) for k, col, _, _ in self.conds) and all(self._real(col) for col, _ in self.orders)
+        use_sql = all(k == "and" and self._real(col) for k, col, _, _ in self.conds) and all(self._real(col) for col, _ in self.orders) and not self.has
         with Session() as s:
             q = s.query(c)
             if use_sql:
@@ -655,7 +852,7 @@ class Query:
                     q = q.order_by(c.id)
                 if self._limit is not None:
                     q = q.limit(self._limit)
-                return [r.to_dict() for r in q]
+                return self._decorate([r.to_dict() for r in q])
             rows = [r.to_dict() for r in q.order_by(c.id)]
         if self.conds:
             def keep(row):
@@ -665,9 +862,11 @@ class Query:
                     res = m if res is None else ((res or m) if k == "or" else (res and m))
                 return res
             rows = [r for r in rows if keep(r)]
+        for rel, hc in self.has:
+            rows = [r for r in rows if any(all(_py_match(x, c, o, v) for c, o, v in hc) for x in getattr(self.cls, rel)(r))]
         for col, desc in reversed(self.orders):
             rows.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
-        return rows[: self._limit] if self._limit is not None else rows
+        return self._decorate(rows[: self._limit] if self._limit is not None else rows)
 
     def first(self):
         saved, self._limit = self._limit, 1
@@ -697,14 +896,26 @@ class Query:
         return n
 "##;
 
-fn models_py(models: &[String], schema: &Schema) -> String {
-    let mut o = String::from("\"\"\"pl2pl が生成したモデル(SQLAlchemy)。\"\"\"\nfrom fastapi import HTTPException\nfrom sqlalchemy import JSON, Boolean, Column, Float, Integer, String, Text\n\nfrom db import Base, Session, engine\n");
+fn models_py(models: &[String], schema: &Schema, rels: &Rels) -> String {
+    let mut o = String::from("\"\"\"pl2pl が生成したモデル(SQLAlchemy)。\"\"\"\nfrom fastapi import HTTPException\nfrom sqlalchemy import JSON, Boolean, Column, Float, Integer, String, Table, Text, select\n\nfrom db import Base, Session, engine\n");
     o.push_str(QUERY_PY);
+    let mut pivots: Vec<(String, String, String)> = vec![];
+    for m in models {
+        for r in rels.get(m).into_iter().flatten().filter(|r| r.kind == "belongsToMany") {
+            if !pivots.iter().any(|p| p.0 == r.pivot) {
+                pivots.push((r.pivot.clone(), r.fk.clone(), r.other_fk.clone()));
+            }
+        }
+    }
+    for (p, a, b) in &pivots {
+        o.push_str(&format!("\n\n{p} = Table(\"{p}\", Base.metadata, Column(\"{a}\", Integer), Column(\"{b}\", Integer))\n"));
+    }
     for m in models {
         let (t, cols) = schema.get(m).cloned().unwrap_or_else(|| (guess_table(m), vec![]));
         let cs: String = cols.iter().map(|(n, ty)| format!("    {n} = Column({ty})\n")).collect();
         let names: String = cols.iter().map(|(n, _)| format!("{n:?}, ")).collect();
-        o.push_str(&MODEL_PY.replace("__M__", m).replace("__T__", &t).replace("__COLS__", &cs).replace("__NAMES__", &names));
+        let relcode: String = rels.get(m).into_iter().flatten().map(rel_methods).collect();
+        o.push_str(&MODEL_PY.replace("__RELS__", &relcode).replace("__M__", m).replace("__T__", &t).replace("__COLS__", &cs).replace("__NAMES__", &names));
     }
     o.push_str("\n\nBase.metadata.create_all(engine)\n");
     o
@@ -886,7 +1097,9 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
     let routes = extract(files, &mut warn);
     let sigs = collect_controllers(files);
     let bodies = collect_bodies(files);
-    let schema = collect_schema(files);
+    let mut schema = collect_schema(files);
+    let rels = collect_relations(files);
+    apply_relations(&mut schema, &rels);
     let aliases = crate::middleware::collect_aliases(files);
     let custom_mw = crate::middleware::collect_custom(files);
     let ctor_mw = crate::middleware::collect_ctor(files);
@@ -952,7 +1165,7 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
                 ctl_body = Some(expr);
             }
         }
-        let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response, &mut need_tpl)) } else { None };
+        let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response, &mut need_tpl, &rels)) } else { None };
         match r.body.as_ref().or(ctl_body.as_ref()) {
             None if multi.is_some() => {
                 for l in multi.unwrap() {
@@ -975,6 +1188,16 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
         m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\nfrom fastapi import Depends\n\nfrom middleware import MiddlewareAbort, {}\n", mwreg.used.join(", ")), 1);
         m = m.replacen("app = FastAPI()\n", "app = FastAPI()\napp.add_exception_handler(MiddlewareAbort, lambda request, exc: exc.response)\n", 1);
     }
+    // リレーション先のモデルも生成する(推移的に)
+    let mut k = 0;
+    while k < models.len() {
+        for r in rels.get(&models[k].clone()).into_iter().flatten() {
+            if !models.contains(&r.related) {
+                models.push(r.related.clone());
+            }
+        }
+        k += 1;
+    }
     let has_tpl = need_tpl || !blade_files.is_empty();
     if has_tpl {
         m = m.replacen("from fastapi import FastAPI\n", "from fastapi import FastAPI\nfrom fastapi import Request\nfrom fastapi.templating import Jinja2Templates\n", 1);
@@ -996,7 +1219,7 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
     let mut outf = vec![("main.py".to_string(), m), ("requirements.txt".to_string(), "fastapi\nuvicorn\n".to_string())];
     if !models.is_empty() {
         outf.push(("db.py".to_string(), DB_PY.to_string()));
-        outf.push(("models.py".to_string(), models_py(&models, &schema)));
+        outf.push(("models.py".to_string(), models_py(&models, &schema, &rels)));
         outf[1].1 = "fastapi\nuvicorn\nsqlalchemy\n".to_string();
     }
     if !mwreg.is_empty() {
@@ -1063,10 +1286,10 @@ mod tests {
         let mut m = vec![];
         let mut r = false;
         let mut t = false;
-        let l = translate_body("$u = User::findOrFail($id); $u->update($request->all()); return response()->json($u);", &mut m, &mut r, &mut t).unwrap();
+        let l = translate_body("$u = User::findOrFail($id); $u->update($request->all()); return response()->json($u);", &mut m, &mut r, &mut t, &HashMap::new()).unwrap();
         assert_eq!(l, vec!["u = User.find_or_fail(id)", "u = User.update(u[\"id\"], (payload or {}))", "return u"]);
         assert_eq!(m, vec!["User"]);
-        assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r, &mut t).is_none());
+        assert!(translate_body("$x = foo(); return $x;", &mut m, &mut r, &mut t, &HashMap::new()).is_none());
     }
 
     #[test]
@@ -1077,6 +1300,8 @@ mod tests {
         assert!(!one);
         assert!(query_expr("User::where('a', 1)->first()").unwrap().2);
         assert!(query_expr("User::where('a', 1)").is_none()); // 終端なし
-        assert!(query_expr("User::where('a', 1)->whereHas('x')->get()").is_none()); // 未対応は TODO のまま
+        assert!(query_expr("User::where('a', 1)->whereDoesntHave('x')->get()").is_none()); // 未対応は TODO のまま
+        let (_, py, _) = query_expr("User::with('posts')->whereHas('posts', function ($q) { $q->where('published', true); })->get()").unwrap();
+        assert_eq!(py, "User.query().with_(\"posts\").where_has(\"posts\", [(\"published\", \"=\", True)]).get()");
     }
 }

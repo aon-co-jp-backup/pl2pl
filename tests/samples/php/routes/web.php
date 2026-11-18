@@ -31,3 +31,10 @@ Route::middleware(['auth', 'throttle:2,1'])->prefix('private')->group(function (
 });
 Route::get('/after', function () { return 'x'; })->middleware('localonly');
 Route::get('/guestonly', function () { return 'g'; })->middleware('guest');
+Route::get('/users/{id}/posts', [UserController::class, 'userPosts']);
+Route::post('/users/{id}/posts', [UserController::class, 'addPost']);
+Route::get('/posts/{id}/author', [UserController::class, 'author']);
+Route::get('/with-posts', [UserController::class, 'withPosts']);
+Route::get('/published-authors', [UserController::class, 'publishedAuthors']);
+Route::post('/users/{id}/roles', [UserController::class, 'giveRole']);
+Route::post('/roles', function (Request $request) { return Role::create($request->all()); });

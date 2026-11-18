@@ -1,9 +1,9 @@
 # pl2pl 引き継ぎ
 ## 到達点(2026-11-18)
 v0.1.0 公開済み(Windows/Linux/macOS のインストーラーと CI の通し試験)。実装済みのコマンドは README の表のとおりです。
-PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
+PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエリビルダ・Blade(Jinja2)・ミドルウェア(`Depends`)まで実FastAPIで通し試験済みです。リレーション(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`・`with`・`whereHas`)も実SQLiteで確認済みです。Numba・Kokkos(Serial)・`pl2pl web` も実機で確認済みです。
 ## 未了(優先順)
-1. PHP: リレーション(`hasMany` / `belongsTo` / `belongsToMany`、`whereHas`、`with`)、`paginate`、`$request->query()`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
+1. PHP: リレーションの残り(`whereDoesntHave`・ネストした `with`・`morph` 系)、`paginate`、`$request->query()`、Blade のコンポーネント・スタック・認可系、`$next` の後でレスポンスを加工するミドルウェア。
 2. COBOL_to・Java_to を、ある程度開発が進んだら pl2pl へ取り込み、元のリポジトリを削除する(所有者の指示。両方とも別セッションが開発中のため、同じファイルの編集が競合しないよう確認してから。**削除は元に戻せないので、取り込み後に最終確認を取る**)。
 3. 共通 IR の試作(COBOL_to・Java_to のコードから共通部分を抽出)。
 4. aruaru-llm との連携(翻訳・説明の補助は変換器と別コンポーネント)。`llm setup` の実導入は未確認。
@@ -11,7 +11,7 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 6. `docs/DESIGN.md` の各節を所有者が書く。一覧(`docs/LANGUAGES.md`)の最新性の検証。
 7. CI(Linux arm64・macOS)での新サンプル(PHP の SQLAlchemy・Jinja2・ミドルウェア)の実行。
 ## 再開用メッセージ
-「F:\pl2pl を再開。PORTING.md の未了の1から進める(まず PHP のリレーション)。変換できない箇所は黙って落とさず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は確認してから。」
+「F:\pl2pl を再開。PORTING.md の未了の1から進める(PHP の残りの項目)。変換できない箇所は黙って落とさず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は確認してから。」
 ---
 ## 決定済み(訂正済み: WEB版は説明とダウンロードのみ、変換はPCアプリ。主要変換元=OSACCESS・ACCESS VBA・VB・VB.NET・VBA・C・C++・C#.NET・COBOL) / Decided (corrected: web = downloads and manuals only; conversion in the PC app)
 以下は訂正前の記述 / Text below predates the correction:
@@ -46,3 +46,5 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-18 追記7**: Blade→Jinja2(`src/blade.rs`)を実装。`{{ }}`・`{!! !!}`(`|safe`)・`??`・`@if/@elseif/@else/@unless/@isset/@empty/@foreach/@forelse/@for`・`@extends/@section/@yield/@parent/@include`・コメントを変換し、`view()`(配列・`compact`・`->with`)と `Route::view` を `templates.TemplateResponse` へ。`@php/@auth/@can/@push/@component` 等や未対応の式は `{# TODO(pl2pl) #}` で残してレポートへ列挙。`@csrf`/`@method` は出力せず警告。実FastAPI+Jinja2で、レイアウト継承・forelse・エスケープ(Blade同様に既定でエスケープ)・`|safe`・メールアドレスの `@` を壊さないことを通し試験で確認。未対応: コンポーネント・スタック・認可ディレクティブ・`@while`・ミドルウェア・リレーション。 / Blade→Jinja2 implemented and e2e-verified; unsupported directives are left as TODO comments and listed in the report.
 
 **2026-11-18 追記8**: Laravel ミドルウェアを FastAPI の `Depends`(生成 `middleware.py`)へ変換(`src/middleware.rs`)。ルートの `->middleware()`・`Route::middleware([...])->prefix()->group()`・コントローラ `__construct` の `$this->middleware()->only/except` を拾う。`auth`(Bearer と環境変数 API_TOKENS の簡易判定。**本物の認証へ差し替えること**)・`guest`(認証済みなら `/` へ302)・`throttle:N,M`(メモリ上の簡易版、ルート×IPで数える)と、独自ミドルウェアの「`if (条件) { abort(N) / response()->json(値,N) / redirect('/x') }` を並べて `return $next($request)`」を変換。`$next` の後でレスポンスを加工する形・else・`can`/`verified`/`signed` 等は依存を付けず、レポートに理由つきで列挙。実FastAPIで 401/403/200・throttle 429(Retry-After)・guest 302 を確認。 / Laravel middleware → FastAPI Depends; verified end-to-end; post-`$next` processing and unsupported names are reported, not silently dropped.
+
+**2026-11-18 追記9**: PHP のリレーションを変換(`hasMany`・`hasOne`・`belongsTo`・`belongsToMany`)。モデルのメソッドから関係を読み、`models.py` に取得・`_create`・`_attach/_detach/_sync` を生成し、中間表は `Table` で自動作成、外部キー列が無ければ実列として追加。コントローラの `$u->posts`・`$p->user`・`$u->posts()->create()`・`->roles()->attach()`、クエリの `with('posts')`・`whereHas('posts', 条件)`・`has('posts')` を変換。実SQLiteの通し試験(作成・取得・eager load・whereHas・多対多の重複 attach 防止)成功、単体テスト30件成功。未対応: `whereDoesntHave`・ネストした `with`・`morph` 系・`paginate`。

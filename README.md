@@ -48,7 +48,8 @@ COBOL_to・Java_to は、ある程度開発が進んだら pl2pl へ取り込み
 - **クエリビルダ**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take` と、`get / first / firstOrFail / count / exists / delete`。`orWhere` は左から順に評価(Laravel の括弧グループとは異なる)。
 - **Blade → Jinja2**(`templates/`): 出力・`@if`・`@foreach`・`@forelse`・`@for`・`@extends/@section/@yield/@include` など。`view()`・`compact`・`->with`・`Route::view` は `TemplateResponse` へ。
 - **ミドルウェア → `Depends`**(`middleware.py`): `auth`(Bearer と環境変数 `API_TOKENS` の簡易判定。**本物の認証へ差し替えること**)、`guest`、`throttle:N,M`(メモリ上の簡易版)、独自ミドルウェアの「条件で拒否 → `return $next($request)`」の形。
-- **未対応(TODO として報告)**: リレーション(`whereHas` など)・`paginate`・`$request->query()`・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
+- **リレーション**: `hasMany` / `hasOne` / `belongsTo` / `belongsToMany`(中間表を自動生成)。`$u->posts`、`$p->user`、`$u->posts()->create([...])`、`attach / detach / sync`、`with('posts')`、`whereHas('posts', fn($q) => $q->where(...))`、`has('posts')` に対応。外部キー列が無ければ追加する。
+- **未対応(TODO として報告)**: `whereDoesntHave`・リレーションのネスト(`with('posts.comments')`)・`morph` 系・`paginate`・`$request->query()`・Blade のコンポーネント/スタック/認可系ディレクティブ・`$next` の後でレスポンスを加工するミドルウェア。
 
 ## 注意
 - 判定は保守的です。依存や副作用の恐れがあるものは**付けずに理由を報告**し、性能は保証しません。
