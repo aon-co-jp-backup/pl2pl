@@ -277,3 +277,17 @@ Em palavras simples: leva programas antigos (COBOL, C, C++, Fortran) para a web 
 - 2026-11-20 追記 / Update: `pl2pl f2rust`(最初の一歩)を追加。単純な Fortran(program・integer/real・do・if/else・print *)を Rust へ。サンプルで期待どおり `sum 10` を出力、単体テスト 48 件成功。配列・subroutine・module・書式付き出力・`**` は TODO(f2rust) のまま。`print *` の書式は近似で、gfortran との出力一致は未確認(この PC に gfortran が無い)。/ Added `pl2pl f2rust` (first step): simple Fortran (program, integer/real, do, if/else, print *) to Rust. The sample prints `sum 10` as expected; 48 unit tests pass. Arrays, subroutines, modules, formatted output and `**` stay as TODO(f2rust). The `print *` layout is approximate and not compared with gfortran (not installed here).
 
 - 2026-11-20 追記 / Update: 本物の gfortran(conda-forge 16.2、`F:\_work\gfnv`)で確認。(1) Fortran の橋渡し: build.sh でビルドし Axum 経由で ` sum          10` を返した。(2) `pl2pl f2rust` の出力が gfortran と完全に一致(`print *` は各項目の前に空白 1 個・整数は幅 11 に合わせた)。小数(real)の桁数は未一致で近似。単体テスト 48 件成功。sudo 無しで入れる方法: micromamba で conda-forge の gfortran。/ Verified with a real gfortran (conda-forge 16.2). (1) The Fortran bridge built with build.sh and returned ` sum          10` through Axum. (2) `pl2pl f2rust` output now matches gfortran exactly (`print *`: one space before each item, integers width 11). Real-number digits are not matched yet (approximate). 48 unit tests pass. No sudo needed: install gfortran with micromamba from conda-forge.
+
+## 2026-11-20 追記: 7Bも動いた / Update: 7B runs too
+
+### 日本語(やさしい説明)
+- **7Bが32GBのパソコンで動きました**: Qwen2.5-7B-Instruct(4つに分かれた約15GB)を、FP8で読み込んで文章を作れました。メモリに収まり、読み込みは約3.5分、文章づくりは1語あたり約8秒(とても遅いけれど、動きます)。品質の目安の迷い度は、評価用の文で8.6、別の文で12.2でした。1.5Bの別の文(12.1)とほぼ同じ値です。
+- **層を飛ばす方法(折り畳み)の最終結果**: 1つの文だけで飛ばす層を選ぶと、別の文で悪くなりました(5・12・15番を飛ばすと別の文で約15%悪化、5層飛ばすとさらに悪化)。速くなるのは最大でも約14%です。**学び直しなしでは、実用的な効果は小さい**です。貪欲法と焼きなましは、この小さな問題では大差ありませんでした。
+- **`pl2pl llm setup` について**: 分割モデルの対応は `aruaru-llm` の `main` に入りました。`pl2pl` が使う配布版(v0.2.5)にはまだ入っていないので、新しい版を出すまで、3Bは今までどおり自動で小さいモデルに下がります。新版を出したら3B・7Bも選べるようにします。
+- **これから(確認せず進めます)**: FP8をもっと速くする(SIMDなど)、新しい版の公開、クラウドで頼んだ調査文書の確認。
+
+### English (plain and friendly)
+- **7B runs on a 32 GB PC**: We loaded Qwen2.5-7B-Instruct (about 15 GB in four parts) as FP8 and it wrote text. It fits in memory; loading took about 3.5 minutes and writing took about 8 seconds per word (very slow, but it works). The quality score (perplexity) was 8.6 on the test sentence and 12.2 on other sentences, about the same as the 1.5B model on other sentences (12.1).
+- **Final result for layer skipping ("folding")**: Choosing layers to skip from a single sentence got worse on other sentences (skipping layers 5, 12 and 15 was about 15% worse on other sentences, and skipping five was worse still). The speed gain is at most about 14%. **Without retraining, the practical gain is small.** On this small problem, greedy search and annealing made little difference.
+- **About `pl2pl llm setup`**: Sharded-model support is now on `main` in `aruaru-llm`. The released build that `pl2pl` uses (v0.2.5) does not have it yet, so until a new release, 3B still falls back to a smaller model as before. After the new release, 3B and 7B can be chosen.
+- **Next (we go on without asking)**: make FP8 faster (SIMD and more), publish a new release, and check the survey document requested from the cloud.
