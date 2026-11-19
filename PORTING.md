@@ -25,3 +25,7 @@
 「F:\pl2pl を再開。PORTING.md の『まだのこと』を上から進める。変換できない所は黙って消さず TODO で残す。実際に動かして確認してから完了と報告する。返答は日本語のみ。push は区切りごとに。」
 
 (2026-11-19 追記)共通の中間表現の試作を `src/ir.rs` に追加。入力=PHP のルート、出力=JSON / OpenAPI(`pl2pl ir <dir> --out <dir> --format json|openapi`)。サンプルの52ルートで、出力が正しい JSON として読めることを確認。次: 型・本体を IR に載せ、FastAPI 出力を IR 経由にする。
+
+(2026-11-19 追記)IR に入力側を追加: Python(Flask `@app.route` / FastAPI `@app.get` 等)と Java(Spring `@GetMapping` 等、クラスの `@RequestMapping` を前置)。`pl2pl ir` は拡張子で自動判定し、ルートを検出しなかったファイルは黙らず報告する。実測: `converters/java_to/tests` で Spring のルート7件を検出、JAX-RS・Servlet・Spark は未検出(報告に出る)。
+**日英独露の検索で分かったこと(2026-11-19)**: ①入力段と出力段を共通の中間データでつなぐ設計が定石(MongoDB の変換器の記事)。②変換規則に合わない所は利用者に知らせる設計が一般的(特許・研究)。③ルート抽出は tree-sitter 製の Noir が実例(Spring・Python)。いまは正規表現なので、取りこぼしが増えたら tree-sitter へ。④OpenAPI を中間形式に使う例が多い(api-doc-parser)。⑤LLM だけの移行は不安定で、規則ベースは同じ入力に同じ結果を返す。変換後はコンパイルやテストで確かめる(候補を誤りの少ない順に並べる研究も)。⑥tree-sitter はファイル単位向き、コードベース全体なら SCIP/LSIF。
+次: JAX-RS・Servlet・Spark の入力側、型と本体の IR 化、tree-sitter 導入の検討。
