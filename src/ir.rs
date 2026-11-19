@@ -66,6 +66,51 @@ pub fn from_java(files: &[(String, String)]) -> Vec<Endpoint> {
     v
 }
 
+/// 入力側: Java の JAX-RS(`@Path` + `@GET` など)・Servlet(`@WebServlet` + `doGet` など)・Spark(`get("/x", ...)`)
+pub fn from_java_other(files: &[(String, String)]) -> Vec<Endpoint> {
+    let class_path = regex::Regex::new(r#"@Path\(\s*"([^"]*)"\s*\)\s*(?:@\w+(?:\([^)]*\))?\s*)*(?:public\s+)?(?:class|interface)"#).unwrap();
+    let jaxrs = regex::Regex::new(r#"@(GET|POST|PUT|PATCH|DELETE)\s*(?:@Path\(\s*"([^"]*)"\s*\)\s*)?(?:@\w+(?:\([^)]*\))?\s*)*public\s+[\w<>\[\], ?.]+\s+(\w+)\s*\("#).unwrap();
+    let jaxrs_rev = regex::Regex::new(r#"@Path\(\s*"([^"]*)"\s*\)\s*@(GET|POST|PUT|PATCH|DELETE)\s*(?:@\w+(?:\([^)]*\))?\s*)*public\s+[\w<>\[\], ?.]+\s+(\w+)\s*\("#).unwrap();
+    let servlet = regex::Regex::new(r#"@WebServlet\(\s*(?:urlPatterns\s*=\s*|value\s*=\s*)?\{?\s*"([^"]*)""#).unwrap();
+    let do_m = regex::Regex::new(r#"void\s+do(Get|Post|Put|Delete|Patch)\s*\("#).unwrap();
+    let spark = regex::Regex::new(r#"(?m)^\s*(get|post|put|patch|delete)\(\s*"([^"]+)"\s*,"#).unwrap();
+    let join = |base: &str, sub: &str| {
+        let s = sub.trim_matches('/');
+        let p = format!("{}{}{}", base.trim_end_matches('/'), if s.is_empty() { "" } else { "/" }, s);
+        if p.is_empty() { "/".to_string() } else if p.starts_with('/') { p } else { format!("/{p}") }
+    };
+    let mut v = vec![];
+    for (name, t) in files.iter().filter(|(n, _)| n.ends_with(".java")) {
+        let base = class_path.captures(t).map(|c| c[1].to_string()).unwrap_or_default();
+        let mut seen: Vec<usize> = vec![];
+        for c in jaxrs_rev.captures_iter(t) {
+            let m = c.get(0).unwrap();
+            seen.push(m.start());
+            v.push(ep(&c[2], &join(&base, &c[1]), &c[3], name, line_of(t, m.start())));
+        }
+        for c in jaxrs.captures_iter(t) {
+            let m = c.get(0).unwrap();
+            // `@Path` が先に付いている形は上で拾い済み(同じメソッドを二重に数えない)
+            let before = &t[m.start().saturating_sub(80)..m.start()];
+            if before.contains("@Path(") && before.trim_end().ends_with(')') && jaxrs_rev.is_match(&t[m.start().saturating_sub(80)..m.end()]) {
+                continue;
+            }
+            let sub = c.get(2).map(|x| x.as_str()).unwrap_or("");
+            v.push(ep(&c[1], &join(&base, sub), &c[3], name, line_of(t, m.start())));
+        }
+        if let Some(c) = servlet.captures(t) {
+            for d in do_m.captures_iter(t) {
+                v.push(ep(&d[1], &c[1], &format!("do{}", &d[1]), name, line_of(t, d.get(0).unwrap().start())));
+            }
+        }
+        for c in spark.captures_iter(t) {
+            let p = regex::Regex::new(r":(\w+)").unwrap().replace_all(&c[2], "{$1}").to_string();
+            v.push(ep(&c[1], &p, "lambda", name, line_of(t, c.get(0).unwrap().start())));
+        }
+    }
+    v
+}
+
 fn q(s: &str) -> String {
     let mut o = String::from("\"");
     for c in s.chars() {
@@ -139,6 +184,36 @@ public class C {
         let e = from_java(&jv);
         assert!(e.iter().any(|x| x.verb == "get" && x.path == "/api/users/{id}"), "{e:?}");
         assert!(e.iter().any(|x| x.verb == "post" && x.path == "/api/users"), "{e:?}");
+    }
+
+    #[test]
+    fn java_jaxrs_servlet_spark() {
+        let f = |n: &str, t: &str| vec![(n.to_string(), t.to_string())];
+        let e = from_java_other(&f("R.java", "@Path(\"/items\")
+public class R {
+ @GET
+ @Path(\"{id}\")
+ public String one(int id) { return \"\"; }
+ @POST
+ public int add(String b) { return 1; }
+}
+"));
+        assert!(e.iter().any(|x| x.verb == "get" && x.path == "/items/{id}"), "{e:?}");
+        assert!(e.iter().any(|x| x.verb == "post" && x.path == "/items"), "{e:?}");
+        assert_eq!(e.len(), 2, "{e:?}");
+        let e = from_java_other(&f("S.java", "@WebServlet(\"/hello\")
+public class S extends HttpServlet {
+ protected void doGet(HttpServletRequest a, HttpServletResponse b) {}
+ protected void doPost(HttpServletRequest a, HttpServletResponse b) {}
+}
+"));
+        assert!(e.iter().any(|x| x.verb == "get" && x.path == "/hello") && e.iter().any(|x| x.verb == "post"), "{e:?}");
+        let e = from_java_other(&f("A.java", "class A { void m() {
+  get(\"/hi/:name\", (req, res) -> \"x\");
+  post(\"/add\", (req, res) -> 1);
+}}
+"));
+        assert!(e.iter().any(|x| x.path == "/hi/{name}") && e.iter().any(|x| x.verb == "post" && x.path == "/add"), "{e:?}");
     }
 
     #[test]

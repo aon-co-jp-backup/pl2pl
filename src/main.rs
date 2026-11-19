@@ -121,6 +121,7 @@ fn main() {
         let mut eps = ir::from_php(&php::extract(&php_files, &mut w));
         eps.extend(ir::from_python(&files));
         eps.extend(ir::from_java(&files));
+        eps.extend(ir::from_java_other(&files));
         // ルートが1つも見つからなかったファイルは黙って捨てず、報告する(正規表現による検出なので取りこぼしがありうる)
         let silent: Vec<&str> = files.iter().filter(|(n, _)| !eps.iter().any(|e| &e.source == n)).map(|(n, _)| n.as_str()).collect();
         if !silent.is_empty() {
