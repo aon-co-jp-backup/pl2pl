@@ -19,6 +19,33 @@ pub struct Endpoint {
     pub body: Body,
 }
 
+/// モデル(テーブル・列・リレーション)。入力側(Eloquent 等)が作り、出力側(SQLAlchemy 等)が書き出す。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Model {
+    pub name: String,
+    pub table: String,
+    pub cols: Vec<(String, &'static str)>,
+    pub rels: Vec<Relation>,
+}
+
+/// リレーション。kind は hasMany / hasOne / belongsTo / belongsToMany / morphMany / morphOne / morphTo。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Relation {
+    pub name: String,
+    pub kind: String,
+    pub related: String,
+    pub fk: String,       // hasMany/hasOne: 相手側の列、belongsTo: 自分側の列、belongsToMany: 中間表の自分側の列
+    pub other_fk: String, // belongsToMany: 中間表の相手側の列
+    pub pivot: String,
+}
+
+/// ミドルウェア(FastAPI の `Depends` にする依存)。コードは変換済みの Python。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Middleware {
+    pub name: String,
+    pub code: String,
+}
+
 /// 関数の本体。変換できたら Python の行、できなければ理由つきの TODO(黙って落とさない)。
 #[derive(Debug, Clone, PartialEq)]
 pub enum Body {

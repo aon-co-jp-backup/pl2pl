@@ -339,76 +339,11 @@ impl Registry {
         self.used.is_empty()
     }
 
-    pub fn render(&self) -> String {
-        let mut o = String::from(PRELUDE);
-        for (_, code) in &self.defs {
-            o.push('\n');
-            o.push_str(code);
-        }
-        o
+    /// IR のミドルウェア定義(依存の名前 + Python のコード)
+    pub fn defs(&self) -> Vec<crate::ir::Middleware> {
+        self.defs.iter().map(|(n, c)| crate::ir::Middleware { name: n.clone(), code: c.clone() }).collect()
     }
 }
-
-const PRELUDE: &str = r##""""pl2pl が生成したミドルウェア(FastAPI の Depends)。
-auth は `Authorization: Bearer <トークン>` が環境変数 API_TOKENS(カンマ区切り)にあるかで判定する。本物の認証(セッション・Sanctum 等)へ差し替えること。
-throttle はメモリ上の簡易版(プロセスを再起動すると数え直し、複数プロセス間では共有されない)。"""
-import fnmatch
-import os
-import time
-
-from fastapi import Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse
-
-
-class MiddlewareAbort(Exception):
-    """ミドルウェアがリクエストを止めて、このレスポンスを返す。"""
-
-    def __init__(self, response):
-        self.response = response
-
-
-def _bearer(request: Request):
-    h = request.headers.get("authorization", "")
-    return h[7:].strip() if h.lower().startswith("bearer ") else None
-
-
-def _valid_token(token) -> bool:
-    return bool(token) and token in [t.strip() for t in os.environ.get("API_TOKENS", "").split(",") if t.strip()]
-
-
-def _is(request: Request, pattern: str) -> bool:
-    return fnmatch.fnmatch(request.url.path.lstrip("/"), pattern)
-
-
-def require_auth(request: Request):
-    if not _valid_token(_bearer(request)):
-        raise MiddlewareAbort(JSONResponse({"message": "Unauthenticated."}, status_code=401))
-
-
-def require_guest(request: Request):
-    if _valid_token(_bearer(request)):
-        raise MiddlewareAbort(RedirectResponse("/", status_code=302))
-
-
-_hits: dict = {}
-
-
-def throttle(limit: int = 60, minutes: int = 1, name: str = "default"):
-    def dep(request: Request):
-        now = time.time()
-        window = minutes * 60
-        route = request.scope.get("route")
-        key = (name, route.path if route else request.url.path, request.client.host if request.client else "?")
-        recent = [t for t in _hits.get(key, []) if now - t < window]
-        if len(recent) >= limit:
-            retry = int(window - (now - recent[0])) + 1
-            raise MiddlewareAbort(JSONResponse({"message": "Too Many Attempts."}, status_code=429, headers={"Retry-After": str(retry)}))
-        recent.append(now)
-        _hits[key] = recent
-
-    return dep
-
-"##;
 
 #[cfg(test)]
 mod tests {

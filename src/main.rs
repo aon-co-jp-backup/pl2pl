@@ -2,6 +2,7 @@ mod cobol;
 mod cport;
 mod gpu;
 mod ir;
+mod ir_emit;
 mod kokkos;
 mod pyhpc;
 mod llm;
