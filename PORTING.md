@@ -31,3 +31,5 @@
 次: JAX-RS・Servlet・Spark の入力側、型と本体の IR 化、tree-sitter 導入の検討。
 
 (2026-11-19 追記)IR の Java 入力側に JAX-RS・Servlet・Spark を追加。`converters/java_to/tests` で12ルートを検出(残り4ファイルはルートを持たないクラスとテスト)。
+
+(2026-11-19 追記)VPS 配備: `easy-web.tokyo/pl2pl/` に紹介・ダウンロードページを公開(`/root/easy-web.tokyo/pl2pl` の clone、`pl2pl-web.service` ポート8142、`domains.toml` に追記。ロールバック=`/root/open-web-server/domains.toml.bak-20261119-pl2pl`)。実測: 公開 200、トップと pdf-r2l-rs ページも 200。更新は VPS 側で `git pull`(静的なので再起動不要)。
