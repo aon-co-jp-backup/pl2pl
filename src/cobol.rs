@@ -2,8 +2,31 @@
 use regex::Regex;
 use std::path::Path;
 
-pub fn build_script(_out: &Path) -> String {
-    "#!/bin/bash\n# pl2pl cobol が生成: GnuCOBOL でビルドする(-std=ibm は IBM 方言寄り。cobc の版により異なる場合あり)\nset -e\nmkdir -p bin\nfor f in *.cbl *.cob; do\n  [ -e \"$f\" ] || continue\n  cobc -x -std=ibm -I . -o \"bin/${f%.*}\" \"$f\"\ndone\n".to_string()
+/// 対応する COBOL の置き場所(OS)。ソースは変えず、その OS で GnuCOBOL(cobc)を使うビルド手順を出す。
+pub const OSES: &[&str] = &["linux", "macos", "unix", "windows"];
+/// 方言: cobc の -std に対応(ibm=メインフレーム寄り、mf=Micro Focus 寄り、default=GnuCOBOL 既定)
+pub const DIALECTS: &[&str] = &["ibm", "mf", "default"];
+
+/// 戻り値: (ファイル名, 中身)。windows は build.bat、そのほかは build.sh。
+pub fn build_script(os: &str, dialect: &str) -> (String, String) {
+    let std = match dialect {
+        "mf" => " -std=mf",
+        "default" => "",
+        _ => " -std=ibm",
+    };
+    if os == "windows" {
+        let b = format!(
+            "@echo off\r\nrem pl2pl cobol: for Windows. Put GnuCOBOL (cobc) on PATH first.\r\nif not exist bin mkdir bin\r\nfor %%f in (*.cbl *.cob) do cobc -x{std} -I . -o bin/%%~nf.exe %%f\r\n"
+        );
+        return ("build.bat".into(), b);
+    }
+    let hint = match os {
+        "macos" => "# macOS: brew install gnu-cobol\n",
+        "unix" => "# UNIX (AIX / Solaris / BSD ...): install cobc from a package or GnuCOBOL source\n",
+        _ => "# Linux: apt install gnucobol (or dnf install gnucobol)\n",
+    };
+    let body = "set -e\nmkdir -p bin\nfor f in *.cbl *.cob; do\n  [ -e \"$f\" ] || continue\n  cobc -x__STD__ -I . -o \"bin/${f%.*}\" \"$f\"\ndone\n".replace("__STD__", std);
+    ("build.sh".into(), format!("#!/bin/bash\n# pl2pl cobol: for {os}, dialect {dialect}\n{hint}{body}"))
 }
 
 pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, String)> {

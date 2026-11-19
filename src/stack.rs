@@ -139,9 +139,13 @@ async fn main() -> Result<(), std::io::Error> {
 "#;
 
 const RPOEM_MAIN: &str = r#"// RPoem / RPoRea の入口。サーバーへの登録は各リポジトリの手順に従い、登録表 cobol_to_out::PROGRAMS を呼ぶ。
+// 外部の CALL が未登録のプログラムなどで落ちても、ほかのプログラムは続けて実行する。
 fn main() {
     for (n, f) in cobol_to_out::PROGRAMS {
-        println!("== {n} ==\n{}", f());
+        match std::panic::catch_unwind(f) {
+            Ok(out) => println!("== {n} ==\n{out}"),
+            Err(_) => println!("== {n} == (実行できませんでした。上のメッセージを確認してください)"),
+        }
     }
 }
 "#;

@@ -21,7 +21,8 @@ use std::path::{Path, PathBuf};
 
 const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバーター / platform and HPC porting converters
 
-  pl2pl cobol  <dir|file> --out <dir>        COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash
+  pl2pl cobol  <dir|file> --out <dir> [--os linux|macos|unix|windows] [--dialect ibm|mf|default]
+                                             COBOL(IBM)+JCL → 選んだ OS の GnuCOBOL(ソースは変えず、検出・ビルド手順・JCL→bash)
   pl2pl c2rust <dir|file> --out <dir>        (最初の一歩)単純な C(変数・if/while/for・関数・printf)→ Rust。わからない行は TODO で残す
   pl2pl cport  <dir|file> --out <dir>        UNIX の C → Windows/Linux で通る C(互換ヘッダー+報告)
   pl2pl omp    <dir|file> --out <dir>        C/C++ の独立ループへ OpenMP 指示行を付ける
@@ -193,7 +194,14 @@ fn main() {
         let _ = util::write(&out, Path::new("mpi_scaffold.py"), pyhpc::MPI_SCAFFOLD);
     }
     if cmd == "cobol" {
-        let _ = util::write(&out, Path::new("build.sh"), &cobol::build_script(&out));
+        let os = arg(&a, "--os").unwrap_or_else(|| "linux".into());
+        let dialect = arg(&a, "--dialect").unwrap_or_else(|| "ibm".into());
+        if !cobol::OSES.contains(&os.as_str()) || !cobol::DIALECTS.contains(&dialect.as_str()) {
+            eprintln!("pl2pl cobol: --os は {} 、--dialect は {} から選んでください", cobol::OSES.join("|"), cobol::DIALECTS.join("|"));
+            std::process::exit(2);
+        }
+        let (bn, bc) = cobol::build_script(&os, &dialect);
+        let _ = util::write(&out, Path::new(&bn), &bc);
     }
     let _ = util::write_report(&out, cmd, &rep);
     println!("pl2pl {cmd}: {n} ファイル処理、レポート {} 項目 → {}", rep.len(), out.display());
