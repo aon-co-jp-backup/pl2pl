@@ -12,7 +12,7 @@
 
 ## まだのこと(優先順)
 1. **確認**: 実際のメールの着信(`version-control --test-notify`。この PC に SMTP の設定が無い)、version-control の `--loop` による自動修正、fastapi 最新版でのテスト(GitHub の毎晩の実行が確かめる)。
-2. IR に型と関数の本体をのせる。いまの FastAPI 変換(`pl2pl php`)を IR 経由にする。ルート抽出が取りこぼすようなら tree-sitter を検討。
+2. (一部済み)IR の `Endpoint` に型つき引数・依存・本体(`Body`: 変換できた Python の行 か 理由つき TODO)をのせ、`pl2pl php` のルート出力は共通の `ir::emit_fastapi_route` を通すようにした(出力は変更前と同一、e2e 49 件成功)。残り: モデル・ミドルウェア・Blade も IR にのせる。ルート抽出が取りこぼすようなら tree-sitter を検討。
 3. `watch` を「本物の新しい版」で試す(laravel・symfony・spring-boot・flask・django・poem は未検証あつかい)。
 4. 毎晩・毎朝の自動実行の登録(この PC では確認コマンドが動かず誤報になるので未登録。登録の例は `scripts/pl2pl-watch.cmd` の先頭)。
 5. easy-web.tokyo のトップページに、pl2pl の紹介カードを足す。

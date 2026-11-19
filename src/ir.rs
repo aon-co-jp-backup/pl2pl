@@ -11,15 +11,28 @@ pub struct Endpoint {
     pub middleware: Vec<String>,
     pub source: String,
     pub line: usize,
+    /// 型つきの引数("id: int" の形)。空なら パスから推測する
+    pub params: Vec<String>,
+    /// FastAPI の `dependencies=[Depends(..)]` に入れる名前
+    pub deps: Vec<String>,
+    /// 関数の本体
+    pub body: Body,
+}
+
+/// 関数の本体。変換できたら Python の行、できなければ理由つきの TODO(黙って落とさない)。
+#[derive(Debug, Clone, PartialEq)]
+pub enum Body {
+    Todo(String),
+    Python(Vec<String>),
 }
 
 /// 入力側: PHP(Laravel / Symfony)
 pub fn from_php(routes: &[Route]) -> Vec<Endpoint> {
-    routes.iter().map(|r| Endpoint { verb: r.verb.to_lowercase(), path: r.path.clone(), name: r.handler.clone(), middleware: r.mw.clone(), source: r.src.clone(), line: r.line }).collect()
+    routes.iter().map(|r| Endpoint { verb: r.verb.to_lowercase(), path: r.path.clone(), name: r.handler.clone(), middleware: r.mw.clone(), source: r.src.clone(), line: r.line, params: vec![], deps: vec![], body: Body::Todo(format!("{}:{}", r.src, r.line)) }).collect()
 }
 
 fn ep(verb: &str, path: &str, name: &str, src: &str, line: usize) -> Endpoint {
-    Endpoint { verb: verb.to_lowercase(), path: path.to_string(), name: name.to_string(), middleware: vec![], source: src.to_string(), line }
+    Endpoint { verb: verb.to_lowercase(), path: path.to_string(), name: name.to_string(), middleware: vec![], source: src.to_string(), line, params: vec![], deps: vec![], body: Body::Todo(format!("{src}:{line}")) }
 }
 
 fn line_of(text: &str, pos: usize) -> usize {
@@ -176,29 +189,61 @@ pub fn to_openapi(eps: &[Endpoint]) -> String {
     format!("{{\n  \"openapi\": \"3.0.3\",\n  \"info\": {{\"title\": \"pl2pl ir\", \"version\": \"0.1.0\"}},\n  \"paths\": {{\n{}\n  }}\n}}\n", body.join(",\n"))
 }
 
-/// 出力側 3: FastAPI の骨組み。本体は IR に無いので TODO を残す(黙って作り話をしない)。同じ関数名は連番にする。
+/// 関数名にできる形へ直し、予約語・重複を避ける
+pub fn unique_name(raw: &str, used: &mut Vec<String>) -> String {
+    const KW: &[&str] = &["False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"];
+    let mut base: String = raw.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+    if base.is_empty() || base.starts_with(|c: char| c.is_ascii_digit()) {
+        base = format!("route_{base}");
+    }
+    if KW.contains(&base.as_str()) {
+        base.push('_');
+    }
+    let mut name = base.clone();
+    let mut n = 2;
+    while used.contains(&name) {
+        name = format!("{base}_{n}");
+        n += 1;
+    }
+    used.push(name.clone());
+    name
+}
+
+/// 出力側 3(共通): 1 本のルートを FastAPI の関数にする。PHP 変換もこれを通る。
+pub fn emit_fastapi_route(e: &Endpoint, fname: &str) -> String {
+    let (path, ps) = split_params(&e.path);
+    let mut args: Vec<String> = if e.params.is_empty() { ps.iter().map(|(p, t)| format!("{p}: {}", match *t { "integer" => "int", "number" => "float", _ => "str" })).collect() } else { e.params.clone() };
+    if args.is_empty() && e.params.is_empty() {
+        args = vec![];
+    }
+    let deps = if e.deps.is_empty() { String::new() } else { format!(", dependencies=[{}]", e.deps.iter().map(|d| format!("Depends({d})")).collect::<Vec<_>>().join(", ")) };
+    let body = match &e.body {
+        Body::Python(lines) => lines.iter().map(|l| format!("    {l}
+")).collect::<String>(),
+        Body::Todo(why) if why.contains(':') && e.params.is_empty() => format!("    # TODO(pl2pl): 本体は未変換です({why})
+    raise NotImplementedError
+"),
+        Body::Todo(why) => format!("    # PHP: {why} ({} {})
+    raise NotImplementedError(\"TODO(pl2pl): {why} を移植する\")
+", e.verb.to_uppercase(), e.path),
+    };
+    format!("
+
+@app.{}({}{deps})
+def {}({}):
+{}", e.verb, q(&path), fname, args.join(", "), body)
+}
+
+/// 出力側 3: FastAPI の骨組み。本体は IR に無ければ TODO を残す(黙って作り話をしない)。同じ関数名は連番にする。
 pub fn to_fastapi(eps: &[Endpoint]) -> String {
-    let mut out = String::from("from fastapi import FastAPI\n\napp = FastAPI()\n");
+    let mut out = String::from("from fastapi import FastAPI
+
+app = FastAPI()
+");
     let mut used: Vec<String> = vec![];
     for e in eps.iter().filter(|e| ["get", "post", "put", "patch", "delete"].contains(&e.verb.as_str())) {
-        let (path, ps) = split_params(&e.path);
-        let mut base: String = e.name.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-        const KW: &[&str] = &["False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"];
-        if base.is_empty() || base.starts_with(|c: char| c.is_ascii_digit()) {
-            base = format!("route_{base}");
-        }
-        if KW.contains(&base.as_str()) {
-            base.push('_');
-        }
-        let mut name = base.clone();
-        let mut n = 2;
-        while used.contains(&name) {
-            name = format!("{base}_{n}");
-            n += 1;
-        }
-        used.push(name.clone());
-        let args: Vec<String> = ps.iter().map(|(p, t)| format!("{p}: {}", match *t { "integer" => "int", "number" => "float", _ => "str" })).collect();
-        out.push_str(&format!("\n\n@app.{}({})\ndef {}({}):\n    # TODO(pl2pl): 本体は未変換です({}:{})\n    raise NotImplementedError\n", e.verb, q(&path), name, args.join(", "), e.source, e.line));
+        let name = unique_name(&e.name, &mut used);
+        out.push_str(&emit_fastapi_route(e, &name));
     }
     out
 }

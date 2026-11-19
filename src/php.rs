@@ -1335,8 +1335,6 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
                 }
             }
         }
-        let dep_arg = if deps.is_empty() { String::new() } else { format!(", dependencies=[{}]", deps.iter().map(|d| format!("Depends({d})")).collect::<Vec<_>>().join(", ")) };
-        let mut body_txt = String::new();
         let raw_body = bodies.get(&(r.class.clone(), r.method.clone())).or(r.raw.as_ref());
         let mut ctl_body = if r.body.is_none() { raw_body.and_then(|b| simple_return(b)) } else { None };
         if r.body.is_none() && ctl_body.is_none() {
@@ -1348,23 +1346,28 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
             }
         }
         let multi = if r.body.is_none() && ctl_body.is_none() { raw_body.and_then(|b| translate_body(b, &mut models, &mut need_response, &mut need_tpl, &rels)) } else { None };
-        match r.body.as_ref().or(ctl_body.as_ref()) {
-            None if multi.is_some() => {
-                for l in multi.unwrap() {
-                    body_txt.push_str(&format!("    {l}\n"));
-                }
-            }
-            Some(b) => body_txt.push_str(&format!("    return {b}\n")),
+        let body = match r.body.as_ref().or(ctl_body.as_ref()) {
+            None if multi.is_some() => crate::ir::Body::Python(multi.unwrap()),
+            Some(b) => crate::ir::Body::Python(vec![format!("return {b}")]),
             None => {
-                body_txt.push_str(&format!("    # PHP: {} ({} {})\n    raise NotImplementedError(\"TODO(pl2pl): {} を移植する\")\n", r.handler, r.verb.to_uppercase(), r.path, r.handler));
                 rep.push(format!("{}:{} {} {} の本体は未変換(TODO)", "routes", r.line, r.verb.to_uppercase(), r.path));
+                crate::ir::Body::Todo(r.handler.clone())
             }
-        }
+        };
+        let body_txt = match &body {
+            crate::ir::Body::Python(l) => l.join("
+"),
+            _ => String::new(),
+        };
         if (body_txt.contains("TemplateResponse(request,") || body_txt.contains(", request)") || body_txt.contains("request.query_params")) && !params.iter().any(|p| p.starts_with("request:")) {
             params.insert(0, "request: Request".into());
         }
-        m.push_str(&format!("\n\n@app.{}({:?}{dep_arg})\ndef {fname}({}):\n", r.verb, path, params.join(", ")));
-        m.push_str(&body_txt);
+        let mut ep = crate::ir::from_php(std::slice::from_ref(r)).remove(0);
+        ep.path = path;
+        ep.params = params;
+        ep.deps = deps;
+        ep.body = body;
+        m.push_str(&crate::ir::emit_fastapi_route(&ep, &fname));
     }
     if !mwreg.is_empty() {
         m = m.replacen("from fastapi import FastAPI\n", &format!("from fastapi import FastAPI\nfrom fastapi import Depends\n\nfrom middleware import MiddlewareAbort, {}\n", mwreg.used.join(", ")), 1);
