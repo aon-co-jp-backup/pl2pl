@@ -1,3 +1,4 @@
+mod c2rust;
 mod cobol;
 mod cport;
 mod gpu;
@@ -21,6 +22,7 @@ use std::path::{Path, PathBuf};
 const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバーター / platform and HPC porting converters
 
   pl2pl cobol  <dir|file> --out <dir>        COBOL(IBM)+JCL → GnuCOBOL(Linux)+bash
+  pl2pl c2rust <dir|file> --out <dir>        (最初の一歩)単純な C(変数・if/while/for・関数・printf)→ Rust。わからない行は TODO で残す
   pl2pl cport  <dir|file> --out <dir>        UNIX の C → Windows/Linux で通る C(互換ヘッダー+報告)
   pl2pl omp    <dir|file> --out <dir>        C/C++ の独立ループへ OpenMP 指示行を付ける
   pl2pl kokkos <dir|file> --out <dir>        C++ の独立ループを Kokkos へ
@@ -167,6 +169,7 @@ fn main() {
     }
     let n = match cmd {
         "cobol" => run(&input, &out, &["cbl", "cob", "cobol", "cpy", "jcl"], &mut rep, cobol::convert),
+        "c2rust" => run(&input, &out, &["c"], &mut rep, c2rust::convert),
         "cport" => run(&input, &out, &["c", "h"], &mut rep, cport::convert),
         "kokkos" => run(&input, &out, &["cc", "cpp", "cxx", "hpp"], &mut rep, kokkos::convert),
         "pyhpc" => {

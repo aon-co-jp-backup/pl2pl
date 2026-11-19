@@ -125,3 +125,11 @@ Em palavras simples: leva programas antigos (COBOL, C, C++, Fortran) para a web 
 **Дальше**: Хранить веса в меньших числах, чтобы запускать ещё более крупные ИИ (около 12 ГБ). Мы продолжаем без вопросов каждый раз: строим, проверяем, исправляем снова и снова.
 
 - 2026-11-19 追記 / Update: 選べる組み合わせのうち Axum・Poem・FastAPI を実際に起動して確認(COBOL の hello が HELLO WORLD を返し、存在しない名前は not_found、画面 `/` は 200)。RPoem/RPoRea は起動未確認。/ Axum, Poem and FastAPI were started and checked (COBOL hello returns HELLO WORLD, unknown name gives not_found, the screen `/` returns 200). RPoem/RPoRea not started yet. 次: C/C++/Fortran→Rust の書き換え、COBOL→別OSのCOBOL拡張。/ Next: rewriting C/C++/Fortran into Rust; extending COBOL-to-other-OS COBOL.
+
+- 2026-11-19 追記 / Update: `pl2pl c2rust`(最初の一歩)を追加。単純な C(変数・四則・if/while/for・関数・printf)を Rust へ。fib のサンプルで gcc と同じ出力を確認。ポインタ・構造体・配列は TODO(c2rust) として残す。Fortran/C++ は未対応。/ Added `pl2pl c2rust` (first step): simple C (variables, arithmetic, if/while/for, functions, printf) to Rust; the fib sample prints the same as gcc. Pointers, structs, arrays stay as TODO(c2rust). Fortran and C++ not yet. 軽い文書作業のクラウド自動実行は、GitHub 接続待ち。/ The cloud schedule for light doc work is waiting for the GitHub connection.
+
+## 2026-11-19 到達点と再開用メモ(日本語・リミット前)
+**できたこと(pl2pl)**: ①`pl2pl web --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend] [--db]` で、サーバー・画面・データベースの組み合わせを選んで変換(COBOL は変換、C・C++・Fortran は元のままビルドして呼ぶ橋渡し)。Axum・Poem・FastAPI は実際に起動して確認済み。②`pl2pl c2rust`(単純な C → Rust、fib で gcc と同じ出力)。③`pl2pl watch` は新版を「まっさらな venv」で試験(WSL)、毎晩 03:00・毎朝 07:00 の自動実行を登録済み。④テストは単体 46 件すべて成功。
+**未了(確認せず自動で進める)**: C++・Fortran の Rust 化と C の対応範囲の拡大(ポインタ・構造体・配列)、gfortran での橋渡しの実機確認、RPoem/RPoRea の起動確認、COBOL を別 OS の COBOL へ直す機能の拡張、メール到達の確認、Kokkos の GPU 実行(新しい GPU の機械が必要)、8 か国語文書の更新。クラウド定期実行は GitHub 接続待ち(https://claude.ai/connect-github)。
+**人に確認すること**: 元の COBOL_to / Java_to の削除だけ(元に戻せないので最後に確認)。
+**再開の手順**: `F:\pl2pl` の `PORTING.md` 末尾を読む。開発・試験はこの PC(WSL)、VPS は配備と確認だけ。`git pull` は VPS の `/root/easy-web.tokyo/pl2pl` で `--ff-only`。
