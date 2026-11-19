@@ -1,40 +1,51 @@
 > Diese Fassung ist eine KI-Übersetzung und wurde noch nicht von Muttersprachlern geprüft. Maßgeblich ist das japanische Original im Wurzelverzeichnis des Repositorys.
 
 # pl2pl
-pl2pl wandelt Code zwischen Programmiersprachen, Frameworks und Betriebssystemen um. Das Projekt steht bei Version 0.1.0 und wird aktiv weiterentwickelt. Installer gibt es für Windows (x64/ARM64), Linux (amd64/arm64) und macOS (arm64/x64). Die Umwandlung läuft in der installierten Desktop-Anwendung (einem Kommandozeilenprogramm); die Website bietet nur Handbücher und Downloads.
-Der Konverter geht bewusst vorsichtig vor. **Was sich nicht umwandeln lässt, wird nie stillschweigend weggelassen, sondern bleibt als `TODO` im Ergebnis stehen und wird samt Begründung im Bericht aufgeführt.**
 
-## Was heute funktioniert
+**pl2pl verwandelt Code aus einer Programmiersprache oder einem Framework in eine andere Sprache oder ein anderes Framework.**
+Zum Beispiel wird aus einer PHP-Website (Laravel) eine Python-Website (FastAPI). pl2pl läuft unter Windows, Linux und Mac (v0.1.0, noch in Entwicklung).
+
+- Die Umwandlung passiert in einer App, die Sie auf Ihrem Computer installieren (ein Kommandozeilenprogramm). Die Website bietet nur Anleitungen und Downloads.
+- Was sich nicht umwandeln lässt, wird nicht stillschweigend gelöscht. pl2pl lässt ein `TODO` stehen und nennt den Grund im Bericht.
+- Das Ziel: bekannte Sprachen und Frameworks in möglichst vielen Kombinationen ineinander umzuwandeln.
+
+## Was heute schon geht
 | Befehl | Was er tut |
 |---|---|
-| `pl2pl cobol` | Wandelt IBM-COBOL samt JCL in GnuCOBOL unter Linux samt bash um. Geprüft, indem das Ergebnis mit GnuCOBOL tatsächlich gebaut und ausgeführt wurde. |
-| `pl2pl omp` | Setzt `#pragma omp parallel for` vor voneinander unabhängige C/C++-Schleifen, auch mit Summenreduktion. Das Ergebnis stimmt mit dem Original überein. |
-| `pl2pl php` | Wandelt Laravel / Symfony in FastAPI um (Details unten). Durchgängig gegen echtes FastAPI, SQLite und Jinja2 getestet. |
-| `pl2pl web` | Erkennt Java, COBOL sowie Flask/Django und übergibt an java_to, cobol_to, 2fastapi oder 2poem. An echten Dateien geprüft. |
-| `pl2pl cport` | Macht aus UNIX-C-Code einen Kompatibilitäts-Header mit mechanischen Ersetzungen und Portierungshinweisen. Mit gcc geprüft. |
-| `pl2pl pyhpc` | Versieht numerische Python-Funktionen mit Numba `@njit`; mit `--mpi` entsteht zusätzlich ein mpi4py-Gerüst. Unter Numba identisches Ergebnis. |
-| `pl2pl kokkos` | Schreibt unabhängige Schleifen als Kokkos um (`parallel_for` / `parallel_reduce`). Mit Kokkos 4.5.01 (Serial) gebaut und ausgeführt. |
-| `pl2pl gpu` | Prototyp: macht aus Schleifen CUDA-artige `.cu`-Dateien oder HLSL. Geprüft wurde nur die erzeugte Ausgabe; die Ausführung auf open-cuda / open-directx ist noch nicht getestet. |
-| `pl2pl llm setup` / `llm start` | Startet das mitgelieferte aruaru-llm und installiert ein Qwen2.5-Modell, das zum freien Arbeitsspeicher passt. Geprüft sind nur die Modellauswahl und `--dry-run`, nicht eine echte Installation. |
-| `pl2pl doctor` | Zeigt CPU-Informationen über das eingebaute open-cpu an. |
+| `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. Einzelheiten: [PHP.md](../../PHP.md) (Japanisch) |
+| `pl2pl web` | Schaut in einen Ordner, erkennt Java, COBOL, PHP und Flask/Django selbst und gibt alles an den passenden Konverter weiter |
+| `pl2pl cobol` | COBOL + JCL → GnuCOBOL (Linux) |
+| `pl2pl omp` / `kokkos` / `gpu` | Schreibt C/C++-Schleifen für OpenMP, Kokkos oder die GPU um (gpu ist ein Prototyp) |
+| `pl2pl cport` | Macht UNIX-C-Code unter Windows und Linux lauffähig |
+| `pl2pl pyhpc` | Beschleunigt Python-Rechnungen mit Numba |
+| `pl2pl watch` | Findet neue Versionen von Sprachen und Frameworks und zieht automatisch nach (siehe unten) |
+| `pl2pl llm setup` | Installiert den KI-Helfer (aruaru-llm) passend zum Computer (die echte Installation ist noch nicht geprüft) |
 
-## PHP-Umwandlung (`pl2pl php`)
-- **Routen**: Laravel `Route::get/post/put/patch/delete/any/resource/apiResource/view`, `prefix`-Gruppen und Symfony `#[Route]`.
-- **Funktionsrümpfe**: einfaches `return`, Rümpfe mit mehreren Anweisungen, `response()->json($x, 201)` und `noContent()`.
-- **Eloquent → SQLAlchemy** (`db.py`, `models.py`): Die Spalten stammen aus den Migrationen oder aus `$fillable`, alles Übrige landet in einer JSON-Spalte `extra`. Über `DATABASE_URL` wird die Datenbank gewählt (standardmäßig SQLite).
-- **Query Builder**: `where / orWhere / whereIn / orderBy / latest / oldest / limit / take / offset / skip`, `paginate / simplePaginate / cursorPaginate` (liest `?page=N`, liefert JSON im Laravel-Format, in Blade funktioniert `links()`), `get / first / firstOrFail / count / exists / delete` sowie `$request->query('k', Standardwert)`.
-- **Relationen**: `hasMany / hasOne / belongsTo / belongsToMany / morphMany / morphOne / morphTo` (Zwischentabelle wird erzeugt), `with` auch verschachtelt als `with('posts.comments')`, `whereHas / has / whereDoesntHave / doesntHave` sowie `attach / detach / sync`.
-- **Blade → Jinja2**: Ausgaben, `@if`, `@foreach`, `@forelse`, `@for`, `@extends/@section/@yield/@include` und mehr.
-- **Middleware → `Depends`**: `auth` (nur eine einfache Bearer-Prüfung – **bitte durch eine echte Authentifizierung ersetzen**), `guest`, `throttle:N,M` und eigene Middleware nach dem Muster „bei Bedingung ablehnen, sonst `return $next($request)`“.
+## Neue Versionen automatisch nachziehen
+Lassen Sie `pl2pl watch` jeden Abend und jeden Morgen laufen.
+1. Es sucht nach neuen Versionen von Sprachen und Frameworks (die Liste steht in `registry/ecosystem.toml`).
+2. Es testet mit der neuen Version. Bestehen die Tests, trägt es die „unterstützte Version“ selbst nach.
+3. Schlagen sie fehl, versucht version-control (mit KI-Hilfe) das Problem zu beheben.
+4. Gelingt auch das nicht, schickt es eine Nachricht an die hinterlegten E-Mail-Adressen und an LINE.
 
-## Geplant (noch nicht umgesetzt)
-- PHP: `@can`-artige Autorisierung und klassenbasierte Blade-Komponenten (anonyme `<x-...>`-Komponenten funktionieren bereits) sowie Middleware, die den Antworttext nach `$next` verändert (Header hinzufügen funktioniert bereits).
-- COBOL_to und Java_to liegen jetzt in `converters/` (Momentaufnahme samt Verlauf, Tests laufen durch). Noch offen: `pl2pl web` auf die mitgelieferten Kopien umstellen, spätere Änderungen aus den Originalen nachziehen und danach die ursprünglichen Repositorys löschen (Vorgabe des Eigentümers; das Löschen lässt sich nicht rückgängig machen und wird vorher bestätigt).
-- Eine gemeinsame Zwischendarstellung (Serverseite, Datenbank/SQL, Oberfläche), damit N Quellen und M Ziele nur N+M statt N×M Bausteine brauchen.
-- Anbindung an aruaru-llm. Erklärungen und die Übersetzung natürlicher Sprache bleiben vom Konverter getrennt; der Konverter selbst hängt nie von einem LLM ab.
-- Kokkos auf der GPU und `Kokkos::View` sowie die Ausführung von Kernels auf open-cuda / open-directx.
-- Weitere Sprachpaare aus `docs/LANGUAGES.md` (nicht jede Kombination wird gebaut).
+Für die zeitgesteuerte Ausführung gibt es `scripts/pl2pl-watch.cmd` (Windows) und `scripts/pl2pl-watch.sh` (Linux/Mac).
+Hinweis: Bei laravel, symfony, flask, django und anderen meldet es bisher nur „Es gibt eine neue Version“. Echte Tests mit den neuen Versionen müssen noch gebaut werden.
 
-## Gut zu wissen
-pl2pl entscheidet im Zweifel vorsichtig. Wo ein Konstrukt Abhängigkeiten oder Nebenwirkungen haben könnte, wird es **nicht umgewandelt, sondern mit Begründung gemeldet**; eine bestimmte Laufzeit-Leistung wird nicht zugesichert. Getestet wurden bisher nur kleine, selbst geschriebene Beispiele, keine großen realen Programme.
-Weiterführend: `docs/DESIGN.md`, `docs/LANGUAGES.md`, `docs/COMBINATIONS.md`.
+## Beispiele
+```
+pl2pl php ./myapp --out ./out
+pl2pl web ./project --target fastapi --out ./out
+```
+
+## Bitte beachten
+- pl2pl geht vorsichtig vor. Was riskant aussieht, bleibt unverändert, und der Grund wird genannt. Eine bestimmte Geschwindigkeit wird nicht zugesichert.
+- Getestet wurde bisher nur mit kleinen Beispielen, noch nicht mit großen echten Programmen.
+
+## Als Nächstes
+- PHP: `@can` (Berechtigungen) und Blade-Komponenten als Klassen.
+- Eine gemeinsame Zwischendarstellung (IR), damit viele weitere Sprachpaare auf einmal möglich werden.
+- Prüfen, ob E-Mail-Benachrichtigung und automatische Reparatur durch KI wirklich funktionieren.
+- Ausführung auf der GPU (open-cuda / open-directx).
+
+## Mehr erfahren
+[LANGUAGES.md](../../LANGUAGES.md) (Liste der Sprachen) / [COMBINATIONS.md](../../COMBINATIONS.md) (Kombinationen) / [DESIGN.md](../../DESIGN.md) (Entwurf, vom Eigentümer verfasst) / [components/README.md](../../../components/README.md) (mitgelieferte Teile). Diese Dokumente sind auf Japanisch.

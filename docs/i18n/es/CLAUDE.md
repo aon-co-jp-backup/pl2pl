@@ -1,10 +1,12 @@
-> Esta versión es una traducción hecha con IA que todavía no ha revisado ningún hablante nativo. Lo que vale es el original en japonés, en la raíz del repositorio.
+> Este texto es una traducción hecha con IA y aún no ha sido revisada por hablantes nativos. La versión de referencia es el original en japonés, en la raíz del repositorio.
 
-# pl2pl CLAUDE
-- **Función**: un conversor entre lenguajes, frameworks y sistemas operativos (programa de línea de comandos en Rust, en `src/`). Los orígenes posibles están en `docs/LANGUAGES.md` y las combinaciones en `docs/COMBINATIONS.md`. El propietario va escribiendo poco a poco la especificación en `docs/DESIGN.md`; no inventes especificación en su nombre.
-- **Reglas**: lo que no se pueda convertir queda como `TODO` y va al informe; nunca lo omitas en silencio. Ejecuta de verdad antes de decir que una tarea está terminada. Mantente prudente: si hay posibles dependencias o efectos secundarios, no conviertas.
-- **PHP**: `src/php.rs`, `src/blade.rs`, `src/middleware.rs`. Prueba de punta a punta: `tests/run-php.sh` (FastAPI, SQLite y Jinja2 reales). Pruebas unitarias: `cargo test --release`. Desde WSL: `wsl -d Ubuntu -- bash <archivo de script>`.
-- **Trampas**: en Windows, escribe los archivos con texto en japonés usando Python con `-X utf8`; mantén los scripts de shell con saltos de línea LF; Git Bash reescribe las rutas `/mnt/...`.
-- **COBOL_to / Java_to**: otras sesiones los están desarrollando. Se incorporarán más adelante, y los originales solo se borran tras una confirmación final, porque no se puede deshacer.
-- **Sistema de traducción** (lenguaje natural): se mantiene separado de los conversores.
-- **Idiomas de la documentación**: japonés en la raíz y otros nueve idiomas en `docs/i18n/` (traducciones con IA, aún sin revisión de hablantes nativos). Cuando cambie el original en japonés, actualiza también las traducciones.
+# pl2pl – notas de desarrollo
+- **Función**: un conversor entre lenguajes, frameworks y sistemas operativos (CLI en Rust, `src/`). Los lenguajes de origen están en `docs/LANGUAGES.md` y las combinaciones en `docs/COMBINATIONS.md`. El propietario escribe el diseño poco a poco en `docs/DESIGN.md`. **No inventes especificaciones en su nombre.**
+- **Rumbo**: conversión de cualquier lenguaje o framework conocido a cualquier otro. No todo de una vez: primero lo elegido. El sitio web solo ofrece manuales y descargas; la conversión se hace en la aplicación de PC.
+- **Reglas**: lo que no se puede convertir queda como `TODO` y se informa (nunca se borra en silencio). Juzgar con prudencia (si puede haber dependencias o efectos secundarios, no convertir). Ejecutarlo de verdad antes de decir «terminado». Sin nuevos REST. Responder solo en japonés.
+- **PHP**: `src/php.rs`, `src/blade.rs`, `src/middleware.rs`. Prueba de extremo a extremo: `tests/run-php.sh` (FastAPI real, SQLite, Jinja2); pruebas unitarias: `cargo test --release`. En WSL: `wsl -d Ubuntu -- bash <archivo>`.
+- **Actualización automática**: `pl2pl watch` (`src/watch.rs`, `registry/ecosystem.toml`). Las entradas sin comando de verificación solo se muestran como «sin verificar» y nunca se suben solas. Los avisos pasan por `--notify-file` de version-control.
+- **Trampas**: escribir los archivos con japonés usando Python `-X utf8`; scripts de shell en LF; Git Bash reescribe las rutas `/mnt/...`; para cadenas con muchas comillas, usar la herramienta Write en lugar de un heredoc.
+- **COBOL_to / Java_to**: ya integrados en `converters/`. Borrar los repositorios originales no se puede deshacer: pedir confirmación final antes.
+- **Sistema de traducción** (lenguaje natural): separado de los conversores. Los conversores no dependen de un LLM.
+- **Idiomas de la documentación**: originales en japonés, más nueve idiomas en `docs/i18n/` (traducciones con IA, sin revisión de nativos). Cuando cambie un original, actualizar las traducciones. Historia anterior: `docs/HISTORY-ja.md`.

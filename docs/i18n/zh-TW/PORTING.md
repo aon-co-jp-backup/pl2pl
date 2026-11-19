@@ -1,16 +1,27 @@
-> 本文由 AI 翻譯,尚未經母語人士校對,內容以儲存庫根目錄的日文原文為準。
+> 本文為 AI 翻譯,尚未經母語人士審閱。請以儲存庫根目錄的日文原文為準。
 
-# pl2pl 交接說明
-## 目前進度(2026-11-19)
-v0.1.0 已發布,提供 Windows、Linux、macOS 安裝程式,CI 中有端對端測試。PHP 轉換已涵蓋路由、多行函式本體、Eloquent(SQLAlchemy)、含分頁的查詢建構器、模型關聯(含巢狀 `with`)、Blade(Jinja2)與中介層(`Depends`),皆已做端對端測試。Numba、Kokkos(Serial)與 `pl2pl web` 都已實際執行確認。
-## 待辦事項(依優先順序)
-1. PHP:`@can` 授權與以類別為基礎的 Blade 元件、在 `$next` 之後修改本文的中介層。
-2. 讓 `pl2pl web` 改用 `converters/` 中的副本,跟進 COBOL_to / Java_to 之後的改動,然後刪除原儲存庫(須先確認;無法復原;其他工作階段可能仍在開發)。
-3. 製作統一中介表示的原型。
-4. 串接 aruaru-llm(`llm setup` 的實際安裝尚未驗證)。
-5. Kokkos 的 GPU / `Kokkos::View`;open-cuda / open-directx 上的 kernel。
-6. 由擁有者撰寫 `docs/DESIGN.md`;確認 `docs/LANGUAGES.md` 是否為最新。
+# pl2pl 交接
+(過去的詳細紀錄在 `docs/HISTORY-ja.md`,日文。)
+
+## 目前狀態(2026-11-19)
+- 已發布 v0.1.0,有 Windows、Linux、Mac 安裝程式和 CI 測試。
+- PHP → FastAPI 已用真實 FastAPI 做過端對端測試(49 項):路由、Eloquent、查詢建構器、Blade、中介軟體、關聯。
+- `pl2pl web` 現在也能自動辨識 PHP 並轉交。
+- 新功能:`pl2pl watch` 發現新版本、測試、修復,實在不行就發通知。version-control 新增了 `--notify-file` 選項。
+- COBOL_to 和 Java_to 已併入 `converters/`。
+
+## 待辦(依優先順序)
+1. **確認**:真實電子郵件是否送達(`version-control --test-notify`)、透過 version-control `--loop` 自動修復、用最新的 fastapi 測試(CI 每晚執行會驗證)。
+2. 用真正的新版本試 `watch`(laravel、symfony、spring-boot、flask、django、poem 目前仍算「未驗證」)。
+3. 登記每晚和每早的執行(`schtasks /Create` 等;這是擁有者自己的環境設定,尚未執行)。
+4. 試作共同的中介表示(IR),作為增加更多語言組合的基礎。
+5. PHP:`@can`、用類別撰寫的 Blade 元件、`$attributes`、`@php`、`morphToMany`。
+6. 與 aruaru-llm 整合(`llm setup` 的實際安裝未驗證)。Kokkos 的 GPU 執行;在 open-cuda / open-directx 上執行核心。
+7. 刪除原本的 COBOL_to 和 Java_to(**無法復原,須先取得最終確認**)。
+8. `docs/DESIGN.md` 由擁有者撰寫。確認 `docs/LANGUAGES.md` 沒有過時。
+
 ## 測試
-`bash tests/run-all.sh`(WSL)、`bash tests/run-php.sh`(PHP 端對端)、`cargo test --release`。
+`bash tests/run-all.sh`(WSL)/ `bash tests/run-php.sh`(PHP 端對端)/ `cargo test --release`
+
 ## 恢復工作用的訊息
-「繼續 F:\pl2pl。從 PORTING.md 的第 1 項開始。無法轉換的部分不要默默丟掉,留下 TODO。先實際執行驗證,再回報完成。push 之前先問我。」
+「繼續 F:\pl2pl。從 PORTING.md 的『待辦』由上往下做。無法轉換的地方不要默默刪掉,留 TODO。真正執行確認後再回報完成。回覆只用日語。每到一個段落就 push。」

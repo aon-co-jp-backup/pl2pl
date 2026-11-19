@@ -1,10 +1,12 @@
-> 本文由 AI 翻譯,尚未經母語人士校對,內容以儲存庫根目錄的日文原文為準。
+> 本文為 AI 翻譯,尚未經母語人士審閱。請以儲存庫根目錄的日文原文為準。
 
-# pl2pl CLAUDE
-- **定位**:語言、框架與作業系統之間的轉換工具(`src/` 下的 Rust 命令列程式)。可轉換的來源見 `docs/LANGUAGES.md`,組合見 `docs/COMBINATIONS.md`。設計規格由擁有者逐步寫入 `docs/DESIGN.md`,請勿擅自替他們撰寫規格。
-- **規則**:無法轉換的部分保留為 `TODO` 並寫進報告,絕不默默丟棄。說任務完成之前,先實際執行驗證。判斷要保守:可能有相依性或副作用時就不轉換。
-- **PHP**:`src/php.rs`、`src/blade.rs`、`src/middleware.rs`。端對端測試為 `tests/run-php.sh`(真實的 FastAPI、SQLite、Jinja2),單元測試用 `cargo test --release`。在 WSL 中以 `wsl -d Ubuntu -- bash <腳本檔>` 執行。
-- **常見陷阱**:在 Windows 上寫入含日文的檔案要用 Python 的 `-X utf8`;shell 腳本維持 LF 換行;Git Bash 會改寫 `/mnt/...` 路徑。
-- **COBOL_to / Java_to**:目前由其他工作階段開發。之後再併入,必須在最終確認後才能刪除原儲存庫,因為無法復原。
-- **翻譯系統**(自然語言)與轉換器分開。
-- **文件語言**:根目錄為日文,`docs/i18n/` 下另有九種語言(AI 翻譯,尚未經母語人士校對)。日文原文有變動時,請同步更新各語言版本。
+# pl2pl 開發筆記
+- **定位**:跨語言、框架、作業系統的轉換工具(Rust 命令列,`src/`)。來源語言清單見 `docs/LANGUAGES.md`,組合見 `docs/COMBINATIONS.md`。設計由擁有者在 `docs/DESIGN.md` 中逐步撰寫。**不要擅自替他們訂規格。**
+- **方向**:面向知名語言和框架之間的多對多轉換。不一次做完,先做選定的。網站只提供說明書和下載,轉換在 PC 應用程式中進行。
+- **規則**:無法轉換的地方留 `TODO` 並回報(不要默默刪掉)。判斷要保守(可能有相依或副作用就不轉換)。真正執行過再說「完成」。不新增 REST。回覆只用日語。
+- **PHP**:`src/php.rs`、`src/blade.rs`、`src/middleware.rs`。端對端測試 `tests/run-php.sh`(真實 FastAPI、SQLite、Jinja2),單元測試 `cargo test --release`。WSL 中用 `wsl -d Ubuntu -- bash <檔案>`。
+- **自動跟進**:`pl2pl watch`(`src/watch.rs`、`registry/ecosystem.toml`)。驗證指令為空的項目只顯示「未驗證」,絕不自動更新。通知透過 version-control 的 `--notify-file`。
+- **常見陷阱**:含日文的檔案用 Python `-X utf8` 寫入;shell 腳本保持 LF;Git Bash 會改寫 `/mnt/...` 路徑;引號很多的字串用 Write 工具,不要用 heredoc。
+- **COBOL_to / Java_to**:已併入 `converters/`。刪除原儲存庫無法復原,須先取得最終確認。
+- **翻譯系統**(自然語言)與轉換器分開。轉換器不依賴 LLM。
+- **文件語言**:原文為日語,`docs/i18n/` 中有 9 種語言(AI 翻譯,未經母語人士審閱)。原文修改後,翻譯也要同步。過往經過見 `docs/HISTORY-ja.md`。

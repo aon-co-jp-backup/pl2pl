@@ -1,16 +1,27 @@
-> Cette version est une traduction réalisée par IA, qui n'a pas encore été relue par des locuteurs natifs. Seul l'original japonais, à la racine du dépôt, fait foi.
+> Ce texte est une traduction automatique par IA, pas encore relue par des locuteurs natifs. Le texte de référence est l'original japonais à la racine du dépôt.
 
-# pl2pl — passation
+# pl2pl – passation
+(Les anciennes notes détaillées sont dans `docs/HISTORY-ja.md`, en japonais.)
+
 ## Où en est-on (2026-11-19)
-La version 0.1.0 est publiée, avec des installateurs pour Windows, Linux et macOS et des tests de bout en bout en CI. La conversion PHP couvre les routes, les corps à plusieurs instructions, Eloquent (SQLAlchemy), le query builder avec pagination, les relations (y compris `with` imbriqué), Blade (Jinja2) et les middlewares (`Depends`), le tout testé de bout en bout. Numba, Kokkos (Serial) et `pl2pl web` ont été confirmés par de vraies exécutions.
-## Points ouverts, par ordre de priorité
-1. PHP : autorisation `@can` et composants Blade à base de classes, middleware modifiant le corps après `$next`.
-2. Faire pointer `pl2pl web` vers les copies de `converters/`, rattraper les changements ultérieurs de COBOL_to / Java_to, puis supprimer les originaux (confirmer d'abord ; irréversible ; une autre session y travaille peut-être encore).
-3. Prototype de la représentation intermédiaire commune.
-4. Intégration d'aruaru-llm (une vraie installation par `llm setup` reste à vérifier).
-5. Kokkos sur GPU / `Kokkos::View` ; noyaux sur open-cuda / open-directx.
-6. Le propriétaire rédige `docs/DESIGN.md` ; vérifier que `docs/LANGUAGES.md` est à jour.
+- La version 0.1.0 est publiée, avec des installateurs pour Windows, Linux et Mac et des tests en CI.
+- PHP → FastAPI est testé de bout en bout avec un vrai FastAPI (49 vérifications) : routes, Eloquent, constructeur de requêtes, Blade, middleware, relations.
+- `pl2pl web` reconnaît désormais aussi PHP et le transmet.
+- Nouveau : `pl2pl watch` repère les nouvelles versions, teste, corrige, et prévient en dernier recours. version-control a reçu l'option `--notify-file`.
+- COBOL_to et Java_to sont intégrés dans `converters/`.
+
+## Reste à faire (par priorité)
+1. **Vérifier** : l'arrivée d'un vrai e-mail (`version-control --test-notify`), la correction automatique via `version-control --loop`, un test avec le dernier fastapi (l'exécution CI de chaque nuit le vérifiera).
+2. Essayer `watch` avec de vraies nouvelles versions (laravel, symfony, spring-boot, flask, django et poem restent « non vérifiés »).
+3. Enregistrer les exécutions du soir et du matin (`schtasks /Create`, etc. ; pas encore fait, car c'est la configuration personnelle du propriétaire).
+4. Prototype de la représentation intermédiaire commune (IR), base pour ajouter beaucoup de paires de langages.
+5. PHP : `@can`, composants Blade en classes, `$attributes`, `@php`, `morphToMany`.
+6. Liaison avec aruaru-llm (l'installation réelle par `llm setup` n'est pas vérifiée). Kokkos sur GPU ; noyaux sur open-cuda / open-directx.
+7. Supprimer les COBOL_to et Java_to d'origine (**irréversible : demander d'abord une confirmation finale**).
+8. Le propriétaire écrit `docs/DESIGN.md`. Vérifier que `docs/LANGUAGES.md` n'est pas périmé.
+
 ## Tests
-`bash tests/run-all.sh` (WSL), `bash tests/run-php.sh` (PHP de bout en bout), `cargo test --release`.
-## Message pour reprendre le travail
-« Reprends F:\pl2pl. Commence par le point 1 de PORTING.md. Ne supprime jamais en silence ce qui n'est pas convertible : laisse un TODO. Vérifie par une vraie exécution avant d'annoncer que c'est terminé. Demande-moi avant de pousser. »
+`bash tests/run-all.sh` (WSL) / `bash tests/run-php.sh` (PHP de bout en bout) / `cargo test --release`
+
+## Message pour reprendre
+« Reprendre F:\pl2pl. Parcourir « Reste à faire » dans PORTING.md depuis le haut. Ne jamais supprimer en silence ce qui ne se convertit pas : laisser un TODO. Vérifier en exécutant pour de vrai avant d'annoncer que c'est fini. Répondre uniquement en japonais. Pousser à chaque étape. »
