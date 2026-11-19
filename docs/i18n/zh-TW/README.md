@@ -42,7 +42,7 @@ pl2pl web ./project --target fastapi --out ./out
 - 目前只在小型範例上測試過,還沒有在大型真實程式上試過。
 
 ## 接下來
-- PHP: 用類別撰寫的 Blade 元件.
+- PHP:用類別撰寫的 Blade 元件。
 - 共同的中介表示(IR),一次增加更多語言組合。
 - 確認真實的電子郵件通知和 AI 自動修復。
 - 在 GPU 上執行(open-cuda / open-directx)。
