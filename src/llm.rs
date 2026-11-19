@@ -59,13 +59,27 @@ pub fn setup(url: &str, dry: bool, force_id: Option<&str>) -> i32 {
         return 1;
     }
     println!("導入中(数分かかることがあります)…");
-    match post(url, "QwenInstall", &format!("{{\"id\":\"{id}\"}}")) {
-        Ok(r) => println!("導入: {}", r.chars().take(200).collect::<String>()),
-        Err(e) => {
-            eprintln!("導入に失敗: {e}\n(aruaru-llm が {url} で動いているか確認してください。components/README.md)");
-            return 1;
+    // 自動選択のときは、失敗したら一段小さいモデルへ(例: 3B は重みが分割されていて取れないことがある)。固定したときは落とさず失敗を返す。
+    let mut order: Vec<&str> = vec![id];
+    if force_id.is_none() {
+        let from = CANDIDATES.iter().position(|c| c.0 == id).map(|i| i + 1).unwrap_or(CANDIDATES.len());
+        order.extend(CANDIDATES[from..].iter().map(|c| c.0));
+    }
+    let mut installed: Option<&str> = None;
+    for cand in order {
+        match post(url, "QwenInstall", &format!("{{\"id\":\"{cand}\"}}")) {
+            Ok(r) => {
+                println!("導入: {}", r.chars().take(200).collect::<String>());
+                installed = Some(cand);
+                break;
+            }
+            Err(e) => eprintln!("{cand} の導入に失敗: {e}"),
         }
     }
+    let Some(id) = installed else {
+        eprintln!("導入に失敗しました。(aruaru-llm が {url} で動いているか、回線を確認してください。components/README.md)");
+        return 1;
+    };
     match post(url, "QwenSelect", &format!("{{\"id\":\"{id}\"}}")) {
         Ok(r) => println!("選択: {}", r.chars().take(200).collect::<String>()),
         Err(e) => {
