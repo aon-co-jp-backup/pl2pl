@@ -111,6 +111,22 @@ pub fn from_java_other(files: &[(String, String)]) -> Vec<Endpoint> {
     v
 }
 
+/// パスの `{id}` / `{int:id}` / `{id?}` を、きれいなパス(`{id}`)と引数の一覧(名前, 型)に分ける
+pub fn split_params(path: &str) -> (String, Vec<(String, &'static str)>) {
+    let re = regex::Regex::new(r"\{(?:(int|float|str|string|path|uuid):)?(\w+)\??(?::[^}]*)?\}").unwrap();
+    let mut ps = vec![];
+    let clean = re.replace_all(path, |c: &regex::Captures| {
+        let ty = match c.get(1).map(|m| m.as_str()) {
+            Some("int") => "integer",
+            Some("float") => "number",
+            _ => "string",
+        };
+        ps.push((c[2].to_string(), ty));
+        format!("{{{}}}", &c[2])
+    });
+    (clean.to_string(), ps)
+}
+
 fn q(s: &str) -> String {
     let mut o = String::from("\"");
     for c in s.chars() {
@@ -149,9 +165,12 @@ pub fn to_openapi(eps: &[Endpoint]) -> String {
             let ops: Vec<String> = v
                 .iter()
                 .filter(|e| ["get", "post", "put", "patch", "delete", "head", "options"].contains(&e.verb.as_str()))
-                .map(|e| format!("      {}: {{\"summary\": {}, \"description\": {}, \"responses\": {{\"200\": {{\"description\": \"OK\"}}}}}}", q(&e.verb), q(&e.name), q(&format!("{}:{}", e.source, e.line))))
+                .map(|e| {
+                    let params: Vec<String> = split_params(&e.path).1.iter().map(|(n, t)| format!("{{\"name\": {}, \"in\": \"path\", \"required\": true, \"schema\": {{\"type\": \"{}\"}}}}", q(n), t)).collect();
+                    format!("      {}: {{\"summary\": {}, \"description\": {}, \"parameters\": [{}], \"responses\": {{\"200\": {{\"description\": \"OK\"}}}}}}", q(&e.verb), q(&e.name), q(&format!("{}:{}", e.source, e.line)), params.join(", "))
+                })
                 .collect();
-            format!("    {}: {{\n{}\n    }}", q(p), ops.join(",\n"))
+            format!("    {}: {{\n{}\n    }}", q(&split_params(p).0), ops.join(",\n"))
         })
         .collect();
     format!("{{\n  \"openapi\": \"3.0.3\",\n  \"info\": {{\"title\": \"pl2pl ir\", \"version\": \"0.1.0\"}},\n  \"paths\": {{\n{}\n  }}\n}}\n", body.join(",\n"))
@@ -214,6 +233,15 @@ public class S extends HttpServlet {
 }}
 "));
         assert!(e.iter().any(|x| x.path == "/hi/{name}") && e.iter().any(|x| x.verb == "post" && x.path == "/add"), "{e:?}");
+    }
+
+    #[test]
+    fn path_params() {
+        let (p, ps) = split_params("/u/{int:id}/p/{slug}/{opt?}");
+        assert_eq!(p, "/u/{id}/p/{slug}/{opt}");
+        assert_eq!(ps, vec![("id".to_string(), "integer"), ("slug".to_string(), "string"), ("opt".to_string(), "string")]);
+        let o = to_openapi(&[ep("get", "/u/{int:id}", "u", "a.py", 1)]);
+        assert!(o.contains("\"/u/{id}\"") && o.contains("\"in\": \"path\"") && o.contains("\"integer\""), "{o}");
     }
 
     #[test]
