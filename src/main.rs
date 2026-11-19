@@ -1,6 +1,7 @@
 mod cobol;
 mod cport;
 mod gpu;
+mod ir;
 mod kokkos;
 mod pyhpc;
 mod llm;
@@ -33,6 +34,7 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl config [llm <auto|off|モデルID>]        LLM の自動導入を外す(off)/ 既定(auto)/ モデル固定。PL2PL_NO_LLM=1 でも外せる
   pl2pl watch [--registry F] [--repo DIR] [--vc version-control] [--dry-run]
                                               言語・FWの新版を検知→通し試験→自動追従→version-controlで修正→メール/LINE通知(毎晩・毎朝に実行)
+  pl2pl ir <dir> --out <dir> [--format json|openapi]   (試作)共通の中間表現: PHP のルートを JSON / OpenAPI へ
   pl2pl --version
 ";
 
@@ -108,6 +110,17 @@ fn main() {
     if cmd == "web" {
         let t = arg(&a, "--target").unwrap_or_else(|| "fastapi".into());
         std::process::exit(web::run(&input, &out, &t, a.iter().any(|x| x == "--dry-run")));
+    }
+    if cmd == "ir" {
+        // 共通の中間表現(試作): 入力のルートを IR にして、json か openapi で書き出す
+        let fmt = arg(&a, "--format").unwrap_or_else(|| "json".into());
+        let files: Vec<(String, String)> = util::files(&input, &["php"]).into_iter().map(|(p, rel)| (rel.to_string_lossy().replace('\\', "/"), util::read(&p))).collect();
+        let mut w: Vec<String> = vec![];
+        let eps = ir::from_php(&php::extract(&files, &mut w));
+        let (name, text) = if fmt == "openapi" { ("openapi.json", ir::to_openapi(&eps)) } else { ("ir.json", ir::to_json(&eps)) };
+        let _ = util::write(&out, Path::new(name), &text);
+        println!("pl2pl ir: {} 件のルート → {}/{}", eps.len(), out.display(), name);
+        return;
     }
     let mut rep: Vec<String> = vec![];
     if cmd == "php" {
