@@ -1,0 +1,65 @@
+# pl2pl が追従する言語・フレームワーク(変換元/変換先)。tested = 通し試験が通った最新の major.minor。
+# 注意: laravel/symfony/spring-boot は通し試験が実物のフレームワークを使わない(変換器の自前解析)ため verify を空にし、新版は「未検証」として報告のみ。
+# source: pypi | crates | npm | github(package = owner/repo)。verify = 差が出たときに走らせる確認コマンド(空なら確認なし)。
+[[eco]]
+name = fastapi
+source = pypi
+package = fastapi
+tested = 0.163
+verify = bash tests/run-php.sh
+
+[[eco]]
+name = sqlalchemy
+source = pypi
+package = sqlalchemy
+tested = 2.1
+verify = bash tests/run-php.sh
+
+[[eco]]
+name = jinja2
+source = pypi
+package = jinja2
+tested = 3.1
+verify = bash tests/run-php.sh
+
+[[eco]]
+name = laravel
+source = github
+package = laravel/framework
+tested = 12.0
+verify =
+
+[[eco]]
+name = symfony
+source = github
+package = symfony/symfony
+tested = 7.3
+verify =
+
+[[eco]]
+name = flask
+source = pypi
+package = flask
+tested = 3.1
+verify =
+
+[[eco]]
+name = django
+source = pypi
+package = django
+tested = 5.2
+verify =
+
+[[eco]]
+name = poem
+source = crates
+package = poem
+tested = 3.1
+verify =
+
+[[eco]]
+name = spring-boot
+source = github
+package = spring-projects/spring-boot
+tested = 3.5
+verify =

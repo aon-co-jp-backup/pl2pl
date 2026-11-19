@@ -79,3 +79,9 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 ## 追記24(2026-11-19)
 - `pl2pl web` が PHP(Laravel/Symfony)を自動検出し、自身の `php` 変換へ振り分けるようにした(`--target fastapi` のみ)。単体テスト追加済み。
 - 方針(ユーザー指示): 有名な言語・フレームワークの任意の組み合わせ間の変換を想定する。次の設計課題は、検出器(入力側)と生成器(出力側)を登録式に分離し、共通中間表現(IR)経由で N×M を N+M に減らすこと。
+
+## 追記25(2026-11-19): 新版への自動追従 `pl2pl watch`
+- `registry/ecosystem.toml` に追従対象(言語・FW、取得元、試験済み major.minor、確認コマンド)を登録。`pl2pl watch` が PyPI/crates.io/npm/GitHub から最新の安定版を取得し、差があれば確認コマンドを実行 → 通れば試験済み版を自動更新 → 通らなければ `version-control --loop --only pl2pl`(aruaru-llm 等のエージェント)で修正 → それでも駄目なら `version-control --notify-file`(今回 version-control に追加。登録済みのメール/LINEへ送る)で通知。
+- 確認コマンドが空の項目は「未検証」と表示するだけで更新しない(laravel/symfony/spring-boot/flask/django/poem。通し試験が実物のフレームワークを使わないため。実物を使う試験の追加が次の課題)。
+- スケジュール: `scripts/pl2pl-watch.cmd`(タスクスケジューラ)/`pl2pl-watch.sh`(cron)、GitHub Actions の `test.yml` に毎晩03:00・毎朝07:00(JST)の cron。登録(`schtasks /Create`)は実行していない(本人の環境設定のため)。
+- 実測: 実レジストリで最新版を取得、fastapi 0.163・sqlalchemy 2.1.9・jinja2 3.1.6 の通し試験(49項目)成功。失敗経路は、偽の確認コマンドで「失敗→通知呼び出し」まで確認。**未確認**: 実SMTPでのメール着信(この環境にSMTP環境変数なし。version-control の `--test-notify` で確認)、version-control の `--loop` による実修正、fastapi 0.165(この環境の venv に pip が無く入れ直せず。CI の毎晩実行が確認する)。

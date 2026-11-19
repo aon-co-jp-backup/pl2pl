@@ -2,3 +2,4 @@ target/
 dist/
 components/bin/
 converters/*/target/
+watch.log

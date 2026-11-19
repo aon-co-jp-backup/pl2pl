@@ -9,6 +9,7 @@ mod omp;
 mod blade;
 mod middleware;
 mod php;
+mod watch;
 mod web;
 mod util;
 
@@ -30,6 +31,8 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
                                               この PC のメモリに合う aruaru-llm のモデルを自動選択して導入(実行したときだけダウンロード)
   pl2pl llm start [--url ...]                  同梱の aruaru-llm を 127.0.0.1 で起動(動いていれば何もしない)
   pl2pl config [llm <auto|off|モデルID>]        LLM の自動導入を外す(off)/ 既定(auto)/ モデル固定。PL2PL_NO_LLM=1 でも外せる
+  pl2pl watch [--registry F] [--repo DIR] [--vc version-control] [--dry-run]
+                                              言語・FWの新版を検知→通し試験→自動追従→version-controlで修正→メール/LINE通知(毎晩・毎朝に実行)
   pl2pl --version
 ";
 
@@ -77,6 +80,16 @@ fn main() {
             }
         }
         return;
+    }
+    if cmd == "watch" {
+        // 毎晩・毎朝のスケジューラから呼ぶ: 新版の検知 → 確認 → 自動追従 → version-control で修正 → 通知
+        let o = watch::Opts {
+            registry: arg(&a, "--registry").map(Into::into).unwrap_or_else(|| "registry/ecosystem.toml".into()),
+            repo: arg(&a, "--repo").map(Into::into).unwrap_or_else(|| ".".into()),
+            dry: a.iter().any(|x| x == "--dry-run"),
+            vc: arg(&a, "--vc").map(Into::into),
+        };
+        std::process::exit(watch::run(&o));
     }
     let (Some(input), Some(out)) = (a.get(2).filter(|x| !x.starts_with("--")), arg(&a, "--out")) else {
         println!("{USAGE}");

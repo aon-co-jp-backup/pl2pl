@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 18 * * *'   # 毎晩 03:00 JST: 最新の fastapi/sqlalchemy/jinja2 で通し試験(pip は常に最新を入れる)
+    - cron: '0 22 * * *'   # 毎朝 07:00 JST
 
 jobs:
   test:
