@@ -169,7 +169,7 @@ fn main() {
     }
     let n = match cmd {
         "cobol" => run(&input, &out, &["cbl", "cob", "cobol", "cpy", "jcl"], &mut rep, cobol::convert),
-        "c2rust" => run(&input, &out, &["c"], &mut rep, c2rust::convert),
+        "c2rust" => run(&input, &out, &["c", "cpp", "cc", "cxx"], &mut rep, c2rust::convert),
         "cport" => run(&input, &out, &["c", "h"], &mut rep, cport::convert),
         "kokkos" => run(&input, &out, &["cc", "cpp", "cxx", "hpp"], &mut rep, kokkos::convert),
         "pyhpc" => {

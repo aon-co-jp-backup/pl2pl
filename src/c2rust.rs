@@ -95,6 +95,7 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
     let ifl = Regex::new(r"^(\}\s*else\s+)?if\s*\((.*)\)\s*\{$").unwrap();
     let whl = Regex::new(r"^while\s*\((.*)\)\s*\{$").unwrap();
     let call = Regex::new(r"^(printf|puts)\s*\((.*)\)\s*;$").unwrap();
+    let cout = Regex::new(r"^(?:std::)?cout\s*<<\s*(.*);$").unwrap();
     let inc = Regex::new(r"^(\w+)(\+\+|--)\s*;$").unwrap();
     FLOATS.with(|f| f.borrow_mut().clear());
     let mut out = String::from("// pl2pl c2rust で変換(最初の一歩)。TODO(c2rust) の行は手で直してください。\n#![allow(unused_mut, unused_variables, unused_parens)]\n\n");
@@ -103,7 +104,7 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
     let mut todo = 0;
     for (i, raw) in src.lines().enumerate() {
         let l = raw.split("//").next().unwrap_or("").trim();
-        if l.is_empty() || l.starts_with("#include") {
+        if l.is_empty() || l.starts_with("#include") || l.starts_with("using namespace") {
             continue;
         }
         let ind = "    ".repeat(stack.len());
@@ -175,6 +176,25 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
                 continue;
             }
         }
+        if let Some(c) = cout.captures(l) {
+            let (mut f, mut a, mut nl) = (String::new(), vec![], false);
+            for it in c[1].split("<<").map(str::trim) {
+                if it == "endl" || it == "std::endl" {
+                    nl = true;
+                } else if it.starts_with('"') && it.ends_with('"') && it.len() >= 2 {
+                    f.push_str(&it[1..it.len() - 1].replace('{', "{{").replace('}', "}}"));
+                } else {
+                    f.push_str("{}");
+                    a.push(expr(it));
+                }
+            }
+            if nl {
+                f.push_str("\n");
+            }
+            out.push_str(&format!("{ind}print!(\"{f}\"{});
+", a.iter().map(|x| format!(", {x}")).collect::<String>()));
+            continue;
+        }
         if let Some(c) = decl.captures(l) {
             let t = rty(&c[1]).unwrap_or("i32");
             if t.starts_with('f') {
@@ -205,7 +225,7 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
     if todo > 0 {
         rep.push(format!("{name}: 未対応の行 {todo} 個(TODO(c2rust) として残しました)"));
     }
-    let base = name.rsplit('/').next().unwrap_or(name).trim_end_matches(".c");
+    let base = name.rsplit('/').next().unwrap_or(name).rsplit_once('.').map(|x| x.0).unwrap_or("prog");
     vec![(format!("{base}.rs"), out)]
 }
 
