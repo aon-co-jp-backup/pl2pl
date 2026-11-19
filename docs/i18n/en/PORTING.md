@@ -21,7 +21,7 @@
 6. PHP: Blade parts written as classes, `$attributes`, `@php`, `morphToMany`.
 7. aruaru-llm link-up (a real `llm setup` install is unchecked). Kokkos on the GPU; kernels on open-cuda / open-directx.
 8. Delete the original COBOL_to and Java_to (**this cannot be undone, so ask for a final OK first**).
-9. The owner writes `docs/DESIGN.md`. Check that `docs/LANGUAGES.md` is not out of date.
+9. The owner writes `docs/DESIGN.md`. We re-read `docs/LANGUAGES.md` on 2026-11-19 and found nothing out of line with the current state (Java and COBOL have converters). It is still a knowledge-based list, not checked against a fresh web search.
 
 ## Tests
 `bash tests/run-all.sh` (WSL) / `bash tests/run-php.sh` (PHP end to end) / `cargo test --release`

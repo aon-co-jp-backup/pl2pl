@@ -19,7 +19,7 @@
 6. PHP: クラスで作る Blade の部品・`$attributes`・`@php`・`morphToMany`。
 7. aruaru-llm との連携(`llm setup` の実導入は未確認)。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行。
 8. 元の COBOL_to・Java_to の削除(**取り返しがつかないので、最後の確認を取ってから**)。
-9. `docs/DESIGN.md` は持ち主が書く。`docs/LANGUAGES.md` が古くないか確認。
+9. `docs/DESIGN.md` は持ち主が書く。`docs/LANGUAGES.md` は 2026-11-19 に中身を見直し、いまの状態(Java・COBOL は変換器あり)と食い違いはなかった(ただし知識ベースの一覧で、検索による最新性の確認はまだ)。
 
 
 ## テスト
