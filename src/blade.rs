@@ -279,55 +279,174 @@ fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
     s
 }
 
-/// `$a = 1; $b = $a + 1;` → `{% set a = 1 %}{% set b = a + 1 %}`。代入以外の文が1つでもあれば None。
+/// `$a = 1; $b = $a + 1; $i++; $s .= 'x';` → `{% set a = 1 %}{% set b = a + 1 %}{% set i = i + 1 %}{% set s = s ~ 'x' %}`。
+/// 代入と `++` `--` `+=` `-=` `*=` `/=` `.=` 以外の文が1つでもあれば None(全体を TODO にする)。
 fn php_sets(code: &str) -> Option<String> {
-    let re = Regex::new(r"(?s)^\$(\w+)\s*=\s*(.+)$").unwrap();
+    let assign = Regex::new(r"(?s)^\$(\w+)\s*=\s*(.+)$").unwrap();
+    let step = Regex::new(r"^\$(\w+)\s*(\+\+|--)$").unwrap();
+    let compound = Regex::new(r"(?s)^\$(\w+)\s*([-+*/.])=\s*(.+)$").unwrap();
     let mut out = String::new();
     for st in code.split(';').map(|x| x.trim()).filter(|x| !x.is_empty()) {
-        let c = re.captures(st)?;
-        out.push_str(&format!("{{% set {} = {} %}}", &c[1], jexpr(&c[2]).ok()?));
+        if let Some(c) = step.captures(st) {
+            out.push_str(&format!("{{% set {0} = {0} {1} 1 %}}", &c[1], if &c[2] == "++" { "+" } else { "-" }));
+        } else if let Some(c) = compound.captures(st) {
+            let op = if &c[2] == "." { "~" } else { &c[2] };
+            out.push_str(&format!("{{% set {0} = {0} {op} ({1}) %}}", &c[1], jexpr(&c[3]).ok()?));
+        } else {
+            let c = assign.captures(st)?;
+            out.push_str(&format!("{{% set {} = {} %}}", &c[1], jexpr(&c[2]).ok()?));
+        }
     }
     Some(out)
 }
 
-/// `{{ $attributes }}` / `{{ $attributes->merge(['class' => 'a', 'type' => 'b']) }}` → Jinja2(呼び出し側が渡した `attributes` 辞書を使う)。
-/// `@props` に宣言した名前(`_props`)は属性として出さない。merge は文字列の組だけ対応(class は呼び出し側の値と空白でつなぐ。ほかは呼び出し側に無いときだけ既定値)。
-/// それ以外の形は触らず、あとの処理が TODO として残す。
+/// クラスで作る Blade の部品(`app/View/Components/Alert.php`)の、画面に効く部分。
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassComp {
+    pub class: String,
+    /// 部品のテンプレートの置き場所(`components/alert.html`、`render()` が `view('x.y')` を返すなら `x/y.html`)
+    pub template: String,
+    /// コンストラクタの引数(名前, Jinja2 の既定値。既定値が無い/変換できないときは None)
+    pub props: Vec<(String, Option<String>)>,
+}
+
+fn kebab(s: &str) -> String {
+    let mut o = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            o.push('-');
+        }
+        o.extend(c.to_lowercase());
+    }
+    o
+}
+
+/// PHP のファイルから、`View/Components/` の下にある `extends Component` のクラスを集める。
+pub fn collect_class_components(files: &[(String, String)], warn: &mut Vec<String>) -> Vec<ClassComp> {
+    let cls = Regex::new(r"class\s+(\w+)\s+extends\s+Component\b").unwrap();
+    let ctor = Regex::new(r"function\s+__construct\s*\(([^)]*)\)").unwrap();
+    let render_view = Regex::new(r#"function\s+render\s*\([^)]*\)[^{]*\{[^}]*?view\(\s*['"]([\w.\-]+)['"]"#).unwrap();
+    let mut out = vec![];
+    for (path, src) in files {
+        let p = path.replace('\\', "/");
+        let Some(i) = p.find("View/Components/") else { continue };
+        let Some(c) = cls.captures(src) else { continue };
+        let rel = p[i + "View/Components/".len()..].trim_end_matches(".php");
+        let tag = rel.split('/').map(kebab).collect::<Vec<_>>().join(".");
+        let template = match render_view.captures(src) {
+            Some(r) => format!("{}.html", r[1].replace('.', "/")),
+            None => format!("components/{}.html", tag.replace('.', "/")),
+        };
+        let mut props = vec![];
+        if let Some(k) = ctor.captures(src) {
+            for prm in split_top_commas(&k[1]).iter().filter(|x| !x.trim().is_empty()) {
+                let (decl, def) = match prm.split_once('=') {
+                    Some((a, b)) => (a.to_string(), Some(b.trim().to_string())),
+                    None => (prm.clone(), None),
+                };
+                let Some(v) = Regex::new(r"\$(\w+)").unwrap().captures(&decl) else { continue };
+                let dj = def.and_then(|d| jexpr(&d).ok());
+                props.push((v[1].to_string(), dj));
+            }
+        }
+        let methods = Regex::new(r"public\s+function\s+(\w+)\s*\(").unwrap().captures_iter(src).map(|m| m[1].to_string()).filter(|m| m != "__construct" && m != "render").count();
+        if methods > 0 {
+            warn.push(format!("{path}: クラス部品 {} の公開メソッド {methods} 個は変換していません(テンプレートの `{{{{ $メソッド() }}}}` は TODO のまま)", &c[1]));
+        }
+        out.push(ClassComp { class: c[1].to_string(), template, props });
+    }
+    out
+}
+
+/// クラス部品の引数を、テンプレートの先頭に `_props`(属性として出さない名前)と既定値として足す。
+pub fn apply_class_component(text: &str, cc: &ClassComp) -> String {
+    if cc.props.is_empty() {
+        return text.to_string();
+    }
+    let names: Vec<String> = cc.props.iter().map(|(n, _)| format!("{n:?}")).collect();
+    let mut head = String::new();
+    if !text.contains("{% set _props") {
+        head.push_str(&format!("{{% set _props = [{}] %}}", names.join(", ")));
+    }
+    for (n, d) in &cc.props {
+        if let Some(d) = d {
+            head.push_str(&format!("{{% set {n} = {n}|default({d}) %}}"));
+        }
+    }
+    format!("{head}{text}")
+}
+
+/// `$attributes` の使い方を Jinja2 へ(呼び出し側が渡した `attributes` 辞書を使う)。`@props`/クラス部品に宣言した名前(`_props`)は属性として出さない。
+/// 対応: `{{ $attributes }}`、`->merge([...])`(class は呼び出し側の値と空白でつなぐ。ほかは呼び出し側に無いときだけ既定値。値は文字列か、変換できる式)、
+/// `->class([...])`(class だけ。文字列の並び)、`->only([...])`、`->except([...])`。それ以外の形は触らず、あとの処理が TODO として残す。
 fn convert_attributes(src: &str) -> String {
     let plain = Regex::new(r"\{\{\s*\$attributes\s*\}\}").unwrap();
-    let merge = Regex::new(r"(?s)\{\{\s*\$attributes->merge\(\s*\[(.*?)\]\s*\)\s*\}\}").unwrap();
-    let pair = Regex::new(r#"^\s*['"]([\w-]+)['"]\s*=>\s*['"]([^'"{}]*)['"]\s*$"#).unwrap();
-    let rest_loop = |skip_class: bool, extra: &str| {
-        let cond = if skip_class { " and k != 'class'" } else { "" };
-        let skip = extra.to_string();
-        format!("{{% for k, v in (attributes|default({{}})).items() if k not in (_props|default([])){cond}{skip} %}} {{{{ k }}}}=\"{{{{ v }}}}\"{{% endfor %}}")
+    let call = Regex::new(r"(?s)\{\{\s*\$attributes->(merge|class|only|except)\(\s*\[(.*?)\]\s*\)\s*\}\}").unwrap();
+    let pair = Regex::new(r#"(?s)^\s*['"]([\w-]+)['"]\s*=>\s*(.+?)\s*$"#).unwrap();
+    let quoted = Regex::new(r#"^['"]([^'"{}]*)['"]$"#).unwrap();
+    let key_list = |raw: &str| -> Option<Vec<String>> {
+        let ks: Vec<String> = split_top_commas(raw).iter().filter(|x| !x.trim().is_empty()).map(|x| x.trim().trim_matches(|c| c == '\'' || c == '"').to_string()).collect();
+        if ks.iter().all(|k| Regex::new(r"^[\w-]+$").unwrap().is_match(k)) { Some(ks) } else { None }
     };
-    let s = plain.replace_all(src, |_: &regex::Captures| rest_loop(false, "")).to_string();
-    merge
-        .replace_all(&s, |c: &regex::Captures| {
-            let items = split_top_commas(&c[1]);
-            let mut defaults: Vec<(String, String)> = vec![];
-            for it in items.iter().filter(|x| !x.trim().is_empty()) {
-                match pair.captures(it) {
-                    Some(p) => defaults.push((p[1].to_string(), p[2].to_string())),
-                    None => return c[0].to_string(), // 文字列以外が混ざる形は変換しない
+    // 属性を出すループ。`only` は指定した名前だけ、それ以外は _props と `skip`(別に出した名前)を除く
+    let rest_loop = |only: Option<&[String]>, skip: &[String]| {
+        let mut cond = String::new();
+        match only {
+            Some(ks) => cond.push_str(&format!(" if k in [{}]", ks.iter().map(|k| format!("'{k}'")).collect::<Vec<_>>().join(", "))),
+            None => {
+                cond.push_str(" if k not in (_props|default([]))");
+                for k in skip {
+                    cond.push_str(&format!(" and k != '{k}'"));
                 }
             }
-            let mut out = String::new();
-            let mut skip = String::new();
-            for (k, v) in &defaults {
-                if k == "class" {
-                    out.push_str(&format!(" class=\"{v}{{% if (attributes|default({{}})).get('class') %}} {{{{ attributes.class }}}}{{% endif %}}\""));
-                } else {
-                    out.push_str(&format!("{{% if '{k}' in (attributes|default({{}})) %}} {k}=\"{{{{ attributes['{k}'] }}}}\"{{% else %}} {k}=\"{v}\"{{% endif %}}"));
-                    skip.push_str(&format!(" and k != '{k}'"));
+        }
+        format!("{{% for k, v in (attributes|default({{}})).items(){cond} %}} {{{{ k }}}}=\"{{{{ v }}}}\"{{% endfor %}}")
+    };
+    let s = plain.replace_all(src, |_: &regex::Captures| rest_loop(None, &[])).to_string();
+    call.replace_all(&s, |c: &regex::Captures| {
+        let (kind, inner) = (&c[1], &c[2]);
+        match kind {
+            "only" | "except" => match key_list(inner) {
+                Some(ks) if kind == "only" => rest_loop(Some(&ks), &[]),
+                Some(ks) => rest_loop(None, &ks),
+                None => c[0].to_string(),
+            },
+            "class" => {
+                // class(['a', 'b']) は文字列の並び。キー付き(条件つき)は未対応
+                let items: Vec<String> = split_top_commas(inner).iter().filter(|x| !x.trim().is_empty()).map(|x| x.trim().to_string()).collect();
+                if items.is_empty() || !items.iter().all(|x| quoted.is_match(x)) {
+                    return c[0].to_string();
                 }
+                let v = items.iter().map(|x| quoted.captures(x).unwrap()[1].to_string()).collect::<Vec<_>>().join(" ");
+                format!(" class=\"{v}{{% if (attributes|default({{}})).get('class') %}} {{{{ attributes.class }}}}{{% endif %}}\"{}", rest_loop(None, &["class".to_string()]))
             }
-            let has_class = defaults.iter().any(|(k, _)| k == "class");
-            out.push_str(&rest_loop(has_class, &skip));
-            out
-        })
-        .to_string()
+            _ => {
+                // merge: 値は文字列か、jexpr で変換できる式
+                let mut out = String::new();
+                let mut skip: Vec<String> = vec![];
+                for it in split_top_commas(inner).iter().filter(|x| !x.trim().is_empty()) {
+                    let Some(p) = pair.captures(it) else { return c[0].to_string() };
+                    let (k, rhs) = (p[1].to_string(), p[2].trim().to_string());
+                    let dv = match quoted.captures(&rhs) {
+                        Some(q) => q[1].to_string(),
+                        None => match jexpr(&rhs) {
+                            Ok(j) => format!("{{{{ {j} }}}}"),
+                            Err(_) => return c[0].to_string(),
+                        },
+                    };
+                    if k == "class" {
+                        out.push_str(&format!(" class=\"{dv}{{% if (attributes|default({{}})).get('class') %}} {{{{ attributes.class }}}}{{% endif %}}\""));
+                    } else {
+                        out.push_str(&format!("{{% if '{k}' in (attributes|default({{}})) %}} {k}=\"{{{{ attributes['{k}'] }}}}\"{{% else %}} {k}=\"{dv}\"{{% endif %}}"));
+                    }
+                    skip.push(k);
+                }
+                out.push_str(&rest_loop(None, &skip));
+                out
+            }
+        }
+    })
+    .to_string()
 }
 
 pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
@@ -646,6 +765,8 @@ mod tests {
         assert!(p.contains("{% set type = type|default('info') %}") && p.contains("{{ slot }}") && p.contains("{% set _props = [\"type\"] %}"), "{p}");
         let a = convert("@props(['type'])<div {{ $attributes->merge(['class' => 'box', 'role' => 'x']) }}>{{ $attributes }}</div>", "c", &mut w);
         assert!(a.contains("class=\"box{% if (attributes|default({})).get('class') %} {{ attributes.class }}{% endif %}\"") && a.contains("{% if 'role' in (attributes|default({})) %}") && a.contains("k not in (_props|default([]))") && !a.contains("TODO"), "{a}");
+        let o2 = convert("<i {{ $attributes->only(['id']) }}></i><b {{ $attributes->except(['id']) }}></b><u {{ $attributes->class(['p', 'q']) }}></u><s {{ $attributes->merge(['title' => $t]) }}></s>", "c", &mut w);
+        assert!(o2.contains("if k in ['id']") && o2.contains("k != 'id'") && o2.contains("class=\"p q{% if") && o2.contains("title=\"{{ t }}\"") && !o2.contains("TODO"), "{o2}");
     }
 
     #[test]
@@ -668,6 +789,8 @@ mod tests {
         assert!(o.contains("TODO(pl2pl): @php") && o.contains("a@b.com"));
         let ph = convert("@php $a = 1; $b = $a + 2; @endphp{{ $b }} @php($c = 'x'){{ $c }}", "p", &mut w);
         assert!(ph.contains("{% set a = 1 %}{% set b = a + 2 %}") && ph.contains("{% set c = 'x' %}") && !ph.contains("TODO"), "{ph}");
+        let pc = convert("@php $i = 1; $i++; $i += 4; $s = 'a'; $s .= 'b'; @endphp", "p", &mut w);
+        assert!(pc.contains("{% set i = i + 1 %}{% set i = i + (4) %}") && pc.contains("{% set s = s ~ ('b') %}") && !pc.contains("TODO"), "{pc}");
         assert!(!w.is_empty());
         assert_eq!(out_path("resources/views/users/index.blade.php"), "users/index.html");
     }

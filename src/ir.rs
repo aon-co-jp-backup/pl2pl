@@ -51,8 +51,18 @@ pub struct Template {
 }
 
 /// 入力側: Blade(`*.blade.php`)
-pub fn from_blade(files: &[(String, String)], warn: &mut Vec<String>) -> Vec<Template> {
-    files.iter().map(|(n, src)| Template { name: crate::blade::out_path(n), source: n.clone(), text: crate::blade::convert(src, n, warn) }).collect()
+pub fn from_blade(files: &[(String, String)], classes: &[crate::blade::ClassComp], warn: &mut Vec<String>) -> Vec<Template> {
+    files
+        .iter()
+        .map(|(n, src)| {
+            let name = crate::blade::out_path(n);
+            let mut text = crate::blade::convert(src, n, warn);
+            if let Some(cc) = classes.iter().find(|c| c.template == name) {
+                text = crate::blade::apply_class_component(&text, cc);
+            }
+            Template { name, source: n.clone(), text }
+        })
+        .collect()
 }
 
 /// ミドルウェア(FastAPI の `Depends` にする依存)。コードは変換済みの Python。

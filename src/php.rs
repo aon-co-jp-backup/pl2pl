@@ -1033,7 +1033,7 @@ pub fn generate(all_files: &[(String, String)], target: &str, rep: &mut Vec<Stri
         rep.push(format!("ミドルウェア {} 個を Depends として middleware.py へ生成(auth は Bearer と環境変数 API_TOKENS で判定する簡易版。本物の認証へ差し替えること)", mwreg.used.len()));
     }
     if has_tpl {
-        outf.extend(crate::ir_emit::templates(&crate::ir::from_blade(&blade_files, rep)));
+        outf.extend(crate::ir_emit::templates(&crate::ir::from_blade(&blade_files, &crate::blade::collect_class_components(files, rep), rep)));
         rep.push(format!("Blade {} 枚を Jinja2(templates/)へ変換(@php・@auth・@can・@push 等は TODO として残し、上のレポートに列挙)", blade_files.len()));
         outf[1].1 = format!("{}jinja2\n", outf[1].1);
     }

@@ -51,6 +51,7 @@ Route::post('/labels', function (Request $request) { return Label::create($reque
 Route::post('/posts/{id}/labels', [UserController::class, 'labelPost']);
 Route::post('/users/{id}/labels', [UserController::class, 'labelUser']);
 Route::get('/badges', fn() => view('badges'));
+Route::get('/chips', fn() => view('chips'));
 Route::get('/comp', [UserController::class, 'comp']);
 Route::get('/phpset', fn() => view('phpset'));
 Route::post('/posts/{id}/notes', [UserController::class, 'addNote']);

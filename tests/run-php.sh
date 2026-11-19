@@ -111,8 +111,10 @@ assert "<i>in</i>" in c.get("/extras", headers={"Authorization": "Bearer z"}).te
 bd = c.get("/badges").text
 assert 'class="badge big"' in bd and 'data-id="7"' in bd and "ok:hi" in bd and "info:plain" in bd and 'kind=' not in bd, bd
 assert '<span class="badge"' in bd and "{{" not in bd, bd
+ch = c.get("/chips").text
+assert 'class="chip"' in ch and "calm/3:a" in ch and "hot/9:b" in ch and 'id="c1"' in ch and 'class="chip z"' in ch and 'tone=' not in ch and 'size=' not in ch, ch
 ps = c.get("/phpset")
-assert ps.status_code == 200 and "<p>sum=7</p>" in ps.text and "<p>hi</p>" in ps.text, ps.text
+assert ps.status_code == 200 and "<p>n=5 t=ab</p>" in ps.text, ps.text
 assert "<u>cannot</u>" in ex.text and "<u>can</u>" not in ex.text, ex.text
 cp = c.get("/comp")
 assert cp.status_code == 200 and 'class="alert error"' in cp.text and 'class="alert info"' in cp.text, cp.text
