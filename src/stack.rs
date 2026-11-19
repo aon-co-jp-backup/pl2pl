@@ -138,14 +138,95 @@ async fn main() -> Result<(), std::io::Error> {
 }
 "#;
 
-const RPOEM_MAIN: &str = r#"// RPoem / RPoRea の入口。サーバーへの登録は各リポジトリの手順に従い、登録表 cobol_to_out::PROGRAMS を呼ぶ。
-// 外部の CALL が未登録のプログラムなどで落ちても、ほかのプログラムは続けて実行する。
-fn main() {
-    for (n, f) in cobol_to_out::PROGRAMS {
-        match std::panic::catch_unwind(f) {
-            Ok(out) => println!("== {n} ==\n{out}"),
-            Err(_) => println!("== {n} == (実行できませんでした。上のメッセージを確認してください)"),
+const RPOEM_MAIN: &str = r#"// RPoem / RPoRea の入口: open-runo-connect-server の Service として `cobol_to.Program/Run` を提供する。
+// 1 つの口で gRPC / gRPC-web / Connect(JSON も可)を受ける。登録表 cobol_to_out::PROGRAMS を呼ぶ。
+// 外部の CALL が未登録のプログラムなどで落ちても、サーバーは止まらずエラーを返す。
+use async_trait::async_trait;
+use hyper::{body::Incoming, service::service_fn, HeaderMap};
+use hyper_util::rt::TokioIo;
+use open_runo_connect_server::{handle, proto_core::{code, Status}, MethodInfo, Output, Service};
+use prost::Message;
+use prost_reflect::DescriptorPool;
+use prost_types::field_descriptor_proto::{Label, Type};
+use prost_types::{DescriptorProto, FieldDescriptorProto, FileDescriptorProto, FileDescriptorSet, MethodDescriptorProto, ServiceDescriptorProto};
+use std::sync::Arc;
+
+const SVC: &str = "cobol_to.Program";
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct RunRequest {
+    #[prost(string, tag = "1")]
+    program: String,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct RunReply {
+    #[prost(string, tag = "1")]
+    output: String,
+}
+
+fn field(name: &str) -> FieldDescriptorProto {
+    FieldDescriptorProto { name: Some(name.into()), number: Some(1), label: Some(Label::Optional as i32), r#type: Some(Type::String as i32), json_name: Some(name.into()), ..Default::default() }
+}
+
+fn pool() -> DescriptorPool {
+    let msg = |n: &str, f: &str| DescriptorProto { name: Some(n.into()), field: vec![field(f)], ..Default::default() };
+    let file = FileDescriptorProto {
+        name: Some("cobol_to/program.proto".into()),
+        package: Some("cobol_to".into()),
+        syntax: Some("proto3".into()),
+        message_type: vec![msg("RunRequest", "program"), msg("RunReply", "output")],
+        service: vec![ServiceDescriptorProto {
+            name: Some("Program".into()),
+            method: vec![MethodDescriptorProto { name: Some("Run".into()), input_type: Some(".cobol_to.RunRequest".into()), output_type: Some(".cobol_to.RunReply".into()), ..Default::default() }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    DescriptorPool::from_file_descriptor_set(FileDescriptorSet { file: vec![file] }).unwrap()
+}
+
+struct Programs {
+    pool: DescriptorPool,
+}
+
+#[async_trait]
+impl Service for Programs {
+    fn service_name(&self) -> &str {
+        SVC
+    }
+    fn method(&self, name: &str) -> Option<MethodInfo> {
+        let m = self.pool.get_service_by_name(SVC)?.methods().find(|m| m.name() == name)?;
+        Some(MethodInfo::with_descriptors(false, m.input(), m.output()))
+    }
+    async fn call(&self, method: &str, _headers: &HeaderMap, message: &[u8]) -> Result<Output, Status> {
+        if method != "Run" {
+            return Err(Status::new(code::UNIMPLEMENTED, "unknown method"));
         }
+        let req = RunRequest::decode(message).map_err(|e| Status::new(code::INVALID_ARGUMENT, e.to_string()))?;
+        let Some((_, f)) = cobol_to_out::PROGRAMS.iter().find(|(n, _)| *n == req.program) else {
+            return Err(Status::new(code::NOT_FOUND, "program not found"));
+        };
+        let out = std::panic::catch_unwind(*f).map_err(|_| Status::new(code::INTERNAL, "program failed (see server log)"))?;
+        Ok(Output::unary(RunReply { output: out }.encode_to_vec()))
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let svc = Arc::new(Programs { pool: pool() });
+    let l = tokio::net::TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    println!("listening on http://127.0.0.1:8080  (POST /cobol_to.Program/Run)");
+    loop {
+        let (s, _) = l.accept().await.unwrap();
+        let svc = svc.clone();
+        tokio::spawn(async move {
+            let f = service_fn(move |req: hyper::Request<Incoming>| {
+                let svc = svc.clone();
+                async move { Ok::<_, std::convert::Infallible>(handle(&*svc, req).await) }
+            });
+            let _ = hyper::server::conn::http1::Builder::new().serve_connection(TokioIo::new(s), f).await;
+        });
     }
 }
 "#;
@@ -199,12 +280,12 @@ pub fn scaffold(out: &Path, s: &Stack) -> usize {
     }
     // Rust 系
     let feat = sqlx_feature(&s.db);
-    let (web_dep, main_rs) = match s.backend.as_str() {
-        "rust-axum" => ("axum = \"*\"\ntower-http = { version = \"*\", features = [\"fs\"] }\nserde_json = \"*\"\n", AXUM_MAIN),
-        "rust-poem" => ("poem = { version = \"*\", features = [\"static-files\"] }\nserde_json = \"*\"\n", POEM_MAIN),
-        "rporea" => ("# RPoRea: path = \"../RPoRea\" (リポジトリ aon-co-jp/RPoRea)\n", RPOEM_MAIN),
-        _ => ("# RPoem: path = \"../RPoem\" (リポジトリ aon-co-jp/RPoem)\n", RPOEM_MAIN),
+    let (web_dep0, main_rs) = match s.backend.as_str() {
+        "rust-axum" => ("axum = \"*\"\ntower-http = { version = \"*\", features = [\"fs\"] }\nserde_json = \"*\"\n".to_string(), AXUM_MAIN),
+        "rust-poem" => ("poem = { version = \"*\", features = [\"static-files\"] }\nserde_json = \"*\"\n".to_string(), POEM_MAIN),
+        _ => (rpoem_deps(), RPOEM_MAIN), // RPoem / RPoRea: RPoem の open-runo-connect-server に載せる(置き場所は環境変数 RPOEM_DIR、既定 ../RPoem)
     };
+    let web_dep: &str = &web_dep0;
     let mut deps = String::new();
     if matches!(s.backend.as_str(), "rust-axum" | "rust-poem") {
         deps.push_str("tokio = { version = \"*\", features = [\"full\"] }\n");
@@ -217,6 +298,11 @@ pub fn scaffold(out: &Path, s: &Stack) -> usize {
     put("Cargo.toml", &cargo_with(&cargo, &deps));
     put("src/main.rs", main_rs);
     n
+}
+
+fn rpoem_deps() -> String {
+    let r = std::env::var("RPOEM_DIR").unwrap_or_else(|_| "../RPoem".into()).replace(char::from(92), "/");
+    format!("open-runo-connect-server = {{ path = \"{r}/crates/open-runo-connect-server\" }}\nasync-trait = \"0.1\"\nhyper = {{ version = \"1\", features = [\"server\", \"http1\"] }}\nhyper-util = {{ version = \"0.1\", features = [\"tokio\"] }}\nprost = \"0.14\"\nprost-types = \"0.14\"\nprost-reflect = \"0.16\"\ntokio = {{ version = \"1\", features = [\"full\"] }}\n") 
 }
 
 /// 変換器が作った Cargo.toml に、[lib]・[[bin]] と依存を足す(`[dependencies]` の中身は保つ)。
