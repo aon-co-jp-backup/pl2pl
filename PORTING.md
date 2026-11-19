@@ -20,7 +20,7 @@
 7. aruaru-llm との連携(`llm setup` の実導入は未確認)。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行。
 8. 元の COBOL_to・Java_to の削除(**取り返しがつかないので、最後の確認を取ってから**)。
 9. `docs/DESIGN.md` は持ち主が書く。`docs/LANGUAGES.md` が古くないか確認。
-10. 英語以外の8言語の文書を、日本語・英語の新しい内容に合わせる。
+
 
 ## テスト
 `bash tests/run-all.sh`(WSL)/ `bash tests/run-php.sh`(PHP 通し)/ `cargo test --release`

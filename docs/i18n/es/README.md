@@ -1,52 +1,56 @@
-> Este texto es una traducción hecha con IA y aún no ha sido revisada por hablantes nativos. La versión de referencia es el original en japonés, en la raíz del repositorio.
+> Nota: el README en japonés de la raíz del repositorio es el original. Esta versión es una traducción hecha con IA, en palabras sencillas, y aún no ha sido revisada por hablantes nativos.
 
 # pl2pl
 
-**pl2pl convierte código escrito en un lenguaje o framework a otro lenguaje o framework.**
-Por ejemplo, un sitio hecho con PHP (Laravel) puede pasar a ser un sitio en Python (FastAPI). Funciona en Windows, Linux y Mac (v0.1.0, en desarrollo).
+## ¿Qué es pl2pl?
+Los programas están escritos en muchos «idiomas» (lenguajes de programación).
+**pl2pl es una herramienta que reescribe un programa de un idioma a otro.**
+Por ejemplo, puede convertir un sitio hecho con PHP (Laravel) en un sitio hecho con Python (FastAPI).
+Funciona en Windows, Linux y Mac (versión 0.1.0, todavía en construcción).
 
-- La conversión se hace en una aplicación que instalas en tu ordenador (una herramienta de línea de comandos). El sitio web solo ofrece manuales y descargas.
-- Lo que no se puede convertir no se borra en silencio: pl2pl deja un `TODO` y explica el motivo en un informe.
-- El objetivo es poder convertir entre los lenguajes y frameworks más conocidos, en el mayor número de combinaciones posible.
+- Se instala en tu ordenador. El sitio web solo tiene guías y descargas → <https://easy-web.tokyo/pl2pl/>
+- Si pl2pl no puede reescribir algo, no lo esconde. Deja un `TODO` (una nota para más tarde) y explica el motivo en un informe.
+- Nuestra meta: poder reescribir entre el mayor número posible de lenguajes conocidos.
 
-## Lo que ya funciona
+## Lo que ya puede hacer
 | Comando | Qué hace |
 |---|---|
-| `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. Detalles: [PHP.md](../../PHP.md) (en japonés) |
-| `pl2pl web` | Examina una carpeta, reconoce por sí solo Java, COBOL, PHP y Flask/Django, y pasa cada parte al conversor adecuado |
-| `pl2pl ir` | (prototipo) Convierte las rutas de PHP, Python y Java a una forma común y escribe JSON, OpenAPI o un esqueleto de FastAPI |
+| `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. Más en [PHP.md](../../PHP.md) (en japonés) |
+| `pl2pl web` | Mira dentro de una carpeta, reconoce Java, COBOL, PHP y Flask/Django, y pasa cada uno a la herramienta adecuada |
+| `pl2pl ir` | (versión de prueba) Pone las «rutas» de PHP, Python y Java en una misma forma y genera JSON, OpenAPI o un esqueleto de FastAPI |
+| `pl2pl watch` | Encuentra versiones nuevas de lenguajes y herramientas y se pone al día solo |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL (Linux) |
-| `pl2pl omp` / `kokkos` / `gpu` | Reescribe bucles de C/C++ para OpenMP, Kokkos o la GPU (gpu es un prototipo) |
-| `pl2pl cport` | Hace que el C de UNIX funcione tanto en Windows como en Linux |
+| `pl2pl omp` / `kokkos` / `gpu` | Hace que los bucles de C/C++ vayan más rápido (gpu es una versión de prueba) |
+| `pl2pl cport` | Hace que el código C para UNIX funcione tanto en Windows como en Linux |
 | `pl2pl pyhpc` | Acelera los cálculos de Python con Numba |
-| `pl2pl watch` | Detecta versiones nuevas de lenguajes y frameworks y se actualiza solo (ver abajo) |
-| `pl2pl llm setup` | Instala el asistente de IA (aruaru-llm) según tu ordenador (la instalación real aún no está comprobada) |
+| `pl2pl llm setup` | Instala el ayudante de IA (aruaru-llm). Todavía no hemos comprobado la instalación real |
 
-## Ponerse al día con las versiones nuevas, de forma automática
-Ejecuta `pl2pl watch` cada noche y cada mañana.
-1. Busca versiones nuevas de lenguajes y frameworks (la lista está en `registry/ecosystem.toml`).
+## Ponerse al día con las versiones nuevas, solo
+Ejecutamos `pl2pl watch` cada noche y cada mañana.
+1. Mira si han salido versiones nuevas de lenguajes y herramientas (la lista está en `registry/ecosystem.toml`).
 2. Prueba con la versión nueva. Si las pruebas pasan, actualiza por sí solo la «versión compatible».
-3. Si fallan, version-control (con ayuda de IA) intenta arreglarlo.
-4. Si aun así no se arregla, avisa a los correos y a LINE registrados.
+3. Si fallan, version-control (con ayuda de la IA) intenta arreglarlo.
+4. Si aun así no se arregla, envía un mensaje a los correos guardados y a LINE.
 
-Los scripts para programarlo son `scripts/pl2pl-watch.cmd` (Windows) y `scripts/pl2pl-watch.sh` (Linux/Mac).
-Nota: con laravel, symfony, flask, django y otros, por ahora solo avisa de que «ha salido una versión nueva». Las pruebas reales con las versiones nuevas están por construir.
+Ten en cuenta: con laravel, symfony, flask, django y algunos más, por ahora solo avisa de que «ha salido una versión nueva».
+En GitHub, también se ejecutan solas cada noche y cada mañana pruebas con las versiones más recientes.
 
-## Ejemplos
+## Cómo se usa
 ```
 pl2pl php ./myapp --out ./out
 pl2pl web ./project --target fastapi --out ./out
+pl2pl ir ./project --out ./out --format openapi
 ```
 
 ## Conviene saber
-- pl2pl es prudente. Lo que parece arriesgado lo deja sin cambiar y explica por qué. No garantiza la velocidad.
-- Solo se ha probado con ejemplos pequeños, todavía no con programas grandes y reales.
+- pl2pl es prudente. Si algo parece arriesgado, lo deja como está y te dice por qué. No podemos prometer velocidad.
+- Solo hemos probado ejemplos pequeños. Todavía no hemos probado programas grandes y reales.
 
 ## Lo que viene
-- PHP: componentes Blade escritos como clases.
-- Una representación intermedia común (IR) para añadir de golpe muchos pares de lenguajes.
-- Comprobar el envío real de correos y la corrección automática con IA.
-- Ejecución en GPU (open-cuda / open-directx).
+- Poner también los tipos y el contenido de las funciones en la forma común y hacer pasar por ella la salida de FastAPI.
+- PHP: piezas de Blade escritas como clases.
+- Comprobar las alertas reales por correo y la corrección automática con IA.
+- Comprobar que funciona en la GPU (open-cuda / open-directx).
 
 ## Más información
-[LANGUAGES.md](../../LANGUAGES.md) (lista de lenguajes) / [COMBINATIONS.md](../../COMBINATIONS.md) (combinaciones) / [DESIGN.md](../../DESIGN.md) (diseño, escrito por el propietario) / [components/README.md](../../../components/README.md) (piezas incluidas). Estos documentos están en japonés.
+[LANGUAGES.md](../../LANGUAGES.md) (lista de lenguajes) / [COMBINATIONS.md](../../COMBINATIONS.md) (combinaciones) / [DESIGN.md](../../DESIGN.md) (el diseño, escrito por el propietario) / [components/README.md](../../../components/README.md) (piezas que vienen con la herramienta). Estos archivos están en japonés.

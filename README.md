@@ -1,7 +1,7 @@
 # pl2pl
 
 **Languages**: 日本語(このファイル) / [English](docs/i18n/en/README.md) / [简体中文](docs/i18n/zh-CN/README.md) / [繁體中文](docs/i18n/zh-TW/README.md) / [한국어](docs/i18n/ko/README.md) / [Deutsch](docs/i18n/de/README.md) / [Français](docs/i18n/fr/README.md) / [Español](docs/i18n/es/README.md) / [Русский](docs/i18n/ru/README.md) / [Português](docs/i18n/pt/README.md)
-(日本語と英語は、やさしい言葉に書き直しました。ほかの言葉は AI 翻訳で、少し古い内容が残っています。ネイティブの確認はまだです)
+(日本語と英語は、やさしい言葉に書き直しました。ほかの言葉も、同じ内容に AI 翻訳しました。ネイティブの確認はまだです)
 
 ## pl2pl ってなに?
 プログラムは、いろいろな「言葉」(プログラミング言語)で書かれています。

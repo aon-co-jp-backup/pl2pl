@@ -11,4 +11,4 @@
 - **Traps**: write files with Japanese using Python `-X utf8`. Keep shell scripts in LF. Git Bash rewrites `/mnt/...` paths. For text with many quotes or `\`, use the Write / Edit tools, not a heredoc.
 - **COBOL_to / Java_to**: already merged into `converters/`. Deleting the original repositories cannot be undone, so ask for a final OK first.
 - **Translation system** (human language) stays apart from the converters. Converters do not rely on an LLM.
-- **Document languages**: the Japanese files are the originals. The English files were rewritten in plain words. The other eight languages (`docs/i18n/`) are AI translations and a little behind (not yet checked by native speakers). Older history: `docs/HISTORY-ja.md`.
+- **Document languages**: the Japanese files are the originals. The English files were rewritten in plain words. The other eight languages (`docs/i18n/`) are AI translations of the same content (not yet checked by native speakers). Older history: `docs/HISTORY-ja.md`.

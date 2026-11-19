@@ -22,7 +22,6 @@
 7. aruaru-llm link-up (a real `llm setup` install is unchecked). Kokkos on the GPU; kernels on open-cuda / open-directx.
 8. Delete the original COBOL_to and Java_to (**this cannot be undone, so ask for a final OK first**).
 9. The owner writes `docs/DESIGN.md`. Check that `docs/LANGUAGES.md` is not out of date.
-10. Bring the other eight languages up to date with the new Japanese and English files.
 
 ## Tests
 `bash tests/run-all.sh` (WSL) / `bash tests/run-php.sh` (PHP end to end) / `cargo test --release`
