@@ -71,6 +71,16 @@ rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert [x["name"] for x in rr] == ["admin"], rr
 rr = c.post(f"/users/{uid}/roles", json={"role_id": role["id"]}).json()
 assert len(rr) == 1, rr
+lb = c.post("/labels", json={"name": "hot"}).json()
+pid = p1.json()["id"]
+pl = c.post(f"/posts/{pid}/labels", json={"label_id": lb["id"]}).json()
+assert [x["name"] for x in pl] == ["hot"], pl
+assert len(c.post(f"/posts/{pid}/labels", json={"label_id": lb["id"]}).json()) == 1
+assert c.post(f"/users/{uid}/labels", json={"label_id": lb["id"]}).json()[0]["name"] == "hot"
+assert len(c.post(f"/users/{uid}/labels", json={"label_id": lb["id"]}).json()) == 1
+lb2 = c.post("/labels", json={"name": "cold"}).json()
+assert len(c.post(f"/posts/{pid}/labels", json={"label_id": lb2["id"]}).json()) == 2
+assert [x["name"] for x in c.post(f"/users/{uid}/labels", json={"label_id": lb["id"]}).json()] == ["hot"]  # 型で分かれている(post の cold は user に出ない)
 assert uid not in [x["id"] for x in c.get("/unpublished").json()]
 lone = c.post("/users", json={"name": "lone", "age": 1}).json()["id"]
 assert lone in [x["id"] for x in c.get("/unpublished").json()]

@@ -361,7 +361,8 @@ fn rel_methods(r: &Relation) -> String {
         "belongsTo" => format!("\n    @classmethod\n    def {n}(cls, row):\n        v = row.get(\"{fk}\")\n        return None if v is None else {rel}.find(v)\n"),
         _ => {
             let (p, o) = (&r.pivot, &r.other_fk);
-            format!("\n    @classmethod\n    def {n}(cls, row):\n        with Session() as s:\n            ids = [x[0] for x in s.execute(select({p}.c.{o}).where({p}.c.{fk} == row[\"id\"]))]\n        return [x for x in ({rel}.find(i) for i in ids) if x]\n\n    @classmethod\n    def {n}_attach(cls, row, ids):\n        ids = ids if isinstance(ids, (list, tuple)) else [ids]\n        have = {{x[\"id\"] for x in cls.{n}(row)}}\n        with Session() as s:\n            for i in ids:\n                if i is not None and int(i) not in have:\n                    s.execute({p}.insert().values({{\"{fk}\": row[\"id\"], \"{o}\": int(i)}}))\n            s.commit()\n\n    @classmethod\n    def {n}_detach(cls, row, ids=None):\n        with Session() as s:\n            q = {p}.delete().where({p}.c.{fk} == row[\"id\"])\n            if ids is not None:\n                ids = ids if isinstance(ids, (list, tuple)) else [ids]\n                q = q.where({p}.c.{o}.in_([int(i) for i in ids]))\n            s.execute(q)\n            s.commit()\n\n    @classmethod\n    def {n}_sync(cls, row, ids):\n        cls.{n}_detach(row)\n        cls.{n}_attach(row, ids)\n")
+            let (tcw, tci) = if r.type_col.is_empty() { (String::new(), String::new()) } else { (format!(".where({p}.c.{} == \"{}\")", r.type_col, r.type_val), format!(", \"{}\": \"{}\"", r.type_col, r.type_val)) };
+            format!("\n    @classmethod\n    def {n}(cls, row):\n        with Session() as s:\n            ids = [x[0] for x in s.execute(select({p}.c.{o}).where({p}.c.{fk} == row[\"id\"]){tcw})]\n        return [x for x in ({rel}.find(i) for i in ids) if x]\n\n    @classmethod\n    def {n}_attach(cls, row, ids):\n        ids = ids if isinstance(ids, (list, tuple)) else [ids]\n        have = {{x[\"id\"] for x in cls.{n}(row)}}\n        with Session() as s:\n            for i in ids:\n                if i is not None and int(i) not in have:\n                    s.execute({p}.insert().values({{\"{fk}\": row[\"id\"], \"{o}\": int(i){tci}}}))\n            s.commit()\n\n    @classmethod\n    def {n}_detach(cls, row, ids=None):\n        with Session() as s:\n            q = {p}.delete().where({p}.c.{fk} == row[\"id\"]){tcw}\n            if ids is not None:\n                ids = ids if isinstance(ids, (list, tuple)) else [ids]\n                q = q.where({p}.c.{o}.in_([int(i) for i in ids]))\n            s.execute(q)\n            s.commit()\n\n    @classmethod\n    def {n}_sync(cls, row, ids):\n        cls.{n}_detach(row)\n        cls.{n}_attach(row, ids)\n")
         }
     }
 }
@@ -370,16 +371,20 @@ fn rel_methods(r: &Relation) -> String {
 pub fn models_py(models: &[Model]) -> String {
     let mut o = String::from("\"\"\"pl2pl が生成したモデル(SQLAlchemy)。\"\"\"\nfrom fastapi import HTTPException\nfrom sqlalchemy import JSON, Boolean, Column, Float, Integer, String, Table, Text, select\n\nfrom db import Base, Session, engine\n");
     o.push_str(QUERY_PY);
-    let mut pivots: Vec<(String, String, String)> = vec![];
+    let mut pivots: Vec<(String, String, String, String)> = vec![];
     for m in models {
-        for r in m.rels.iter().filter(|r| r.kind == "belongsToMany") {
+        for r in m.rels.iter().filter(|r| matches!(r.kind.as_str(), "belongsToMany" | "morphToMany")) {
             if !pivots.iter().any(|p| p.0 == r.pivot) {
-                pivots.push((r.pivot.clone(), r.fk.clone(), r.other_fk.clone()));
+                pivots.push((r.pivot.clone(), r.fk.clone(), r.other_fk.clone(), r.type_col.clone()));
             }
         }
     }
-    for (p, a, b) in &pivots {
-        o.push_str(&format!("\n\n{p} = Table(\"{p}\", Base.metadata, Column(\"{a}\", Integer), Column(\"{b}\", Integer))\n"));
+    for (p, a, b, t) in &pivots {
+        let tcol = if t.is_empty() { String::new() } else { format!(", Column(\"{t}\", String(255))") };
+        o.push_str(&format!("
+
+{p} = Table(\"{p}\", Base.metadata, Column(\"{a}\", Integer), Column(\"{b}\", Integer){tcol})
+"));
     }
     for md in models {
         let (m, t, cols) = (&md.name, &md.table, &md.cols);

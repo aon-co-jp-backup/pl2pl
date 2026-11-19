@@ -513,7 +513,7 @@ type Rels = HashMap<String, Vec<Rel>>;
 fn collect_relations(files: &[(String, String)]) -> Rels {
     let mut out = Rels::new();
     let cls = Regex::new(r"class\s+(\w+)\s+extends\s+(?:Model|Authenticatable|\w*Model)\b").unwrap();
-    let f = Regex::new(r"function\s+(\w+)\s*\(\s*\)\s*(?::\s*[\w\\?|]+\s*)?\{\s*return\s+\$this->(hasMany|hasOne|belongsTo|belongsToMany|morphMany|morphOne|morphTo)\(([^;]*)\)\s*;\s*\}").unwrap();
+    let f = Regex::new(r"function\s+(\w+)\s*\(\s*\)\s*(?::\s*[\w\\?|]+\s*)?\{\s*return\s+\$this->(hasMany|hasOne|belongsTo|belongsToMany|morphToMany|morphMany|morphOne|morphTo)\(([^;]*)\)\s*;\s*\}").unwrap();
     let cr = Regex::new(r"([\w\\]+)::class").unwrap();
     for (_, src) in files {
         let Some(c) = cls.captures(src) else { continue };
@@ -539,6 +539,11 @@ fn collect_relations(files: &[(String, String)]) -> Rels {
                     let mn = args.first().map(|a| unq(a)).filter(|a| !a.is_empty()).unwrap_or_else(|| lower_snake(&name));
                     (format!("{mn}_id"), format!("{mn}_type"), String::new())
                 }
+                "morphToMany" => {
+                    // morphToMany(Tag::class, 'taggable'[, 表, 自分側の列, 相手側の列]): 中間表 taggables(tag_id, taggable_id, taggable_type)
+                    let mn = arg(1).unwrap_or_else(|| lower_snake(&name));
+                    (arg(3).unwrap_or_else(|| format!("{mn}_id")), arg(4).unwrap_or_else(|| format!("{}_id", lower_snake(&related))), arg(2).unwrap_or_else(|| format!("{mn}s")))
+                }
                 "belongsToMany" => {
                     let mut names = [lower_snake(&owner), lower_snake(&related)];
                     names.sort();
@@ -546,7 +551,7 @@ fn collect_relations(files: &[(String, String)]) -> Rels {
                 }
                 _ => (arg(1).unwrap_or_else(|| format!("{}_id", lower_snake(&owner))), String::new(), String::new()),
             };
-            out.entry(owner.clone()).or_default().push(Rel { name, kind, related, fk, other_fk, pivot });
+            out.entry(owner.clone()).or_default().push(Rel { type_col: if kind == "morphToMany" { format!("{}_type", fk.trim_end_matches("_id")) } else { String::new() }, type_val: if kind == "morphToMany" { owner.clone() } else { String::new() }, name, kind, related, fk, other_fk, pivot });
         }
     }
     out
@@ -612,7 +617,7 @@ fn rel_call(st: &str, vars: &HashMap<String, String>, rels: &Rels) -> Option<(St
     let r = rels.get(model)?.iter().find(|r| r.name == c[2])?;
     let ok = match &c[3] {
         "create" => matches!(r.kind.as_str(), "hasMany" | "hasOne" | "morphMany" | "morphOne"),
-        _ => r.kind == "belongsToMany",
+        _ => matches!(r.kind.as_str(), "belongsToMany" | "morphToMany"),
     };
     if !ok {
         return None;

@@ -28,7 +28,7 @@ pub struct Model {
     pub rels: Vec<Relation>,
 }
 
-/// リレーション。kind は hasMany / hasOne / belongsTo / belongsToMany / morphMany / morphOne / morphTo。
+/// リレーション。kind は hasMany / hasOne / belongsTo / belongsToMany / morphMany / morphOne / morphTo / morphToMany。
 #[derive(Debug, Clone, PartialEq)]
 pub struct Relation {
     pub name: String,
@@ -37,6 +37,8 @@ pub struct Relation {
     pub fk: String,       // hasMany/hasOne: 相手側の列、belongsTo: 自分側の列、belongsToMany: 中間表の自分側の列
     pub other_fk: String, // belongsToMany: 中間表の相手側の列
     pub pivot: String,
+    pub type_col: String, // morphToMany: 中間表の「型」列(例 taggable_type)。それ以外は空
+    pub type_val: String, // morphToMany: 保存する型の値(持ち主のクラス名)
 }
 
 /// テンプレート(画面)。入力側(Blade)が `name`(論理名: users/index.html)と中身を作り、出力側が書き出す。

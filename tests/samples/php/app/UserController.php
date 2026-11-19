@@ -132,4 +132,14 @@ class UserController {
     public function notesWith() {
         return Post::with('tags')->get();
     }
+    public function labelPost(Request $request, $id) {
+        $post = Post::findOrFail($id);
+        $post->labels()->attach($request->input('label_id'));
+        return $post->labels;
+    }
+    public function labelUser(Request $request, $id) {
+        $user = User::findOrFail($id);
+        $user->labels()->attach($request->input('label_id'));
+        return $user->labels;
+    }
 }
