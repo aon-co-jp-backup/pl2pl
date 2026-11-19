@@ -66,7 +66,7 @@ pub fn plan(dir: &Path, out: &Path, target: &str) -> Vec<Job> {
 fn resolve_in(dirs: &[std::path::PathBuf], name: &str) -> std::path::PathBuf {
     let file = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
     for d in dirs {
-        for c in [d.join(&file), d.join("components").join("bin").join(&file)] {
+        for c in [d.join(&file), d.join("components").join("bin").join(&file), d.join("..").join("lib").join("pl2pl").join(&file)] {
             if c.is_file() {
                 return c;
             }
@@ -124,6 +124,11 @@ mod tests {
         assert_eq!(resolve_in(&[d.clone()], "java_to"), d.join("components").join("bin").join(file));
         std::fs::write(d.join(file), "x").unwrap();
         assert_eq!(resolve_in(&[d.clone()], "java_to"), d.join(file)); // 実行ファイルの隣が先
+        let bin = d.join("usr").join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::create_dir_all(d.join("usr").join("lib").join("pl2pl")).unwrap();
+        std::fs::write(d.join("usr").join("lib").join("pl2pl").join(file), "x").unwrap();
+        assert_eq!(resolve_in(&[bin.clone()], "java_to"), bin.join("..").join("lib").join("pl2pl").join(file)); // deb/pkg の /usr/lib/pl2pl
         std::fs::remove_dir_all(&d).ok();
     }
 

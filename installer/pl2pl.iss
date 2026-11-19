@@ -47,6 +47,7 @@ Name: "addpath"; Description: "PATH に追加 / Add to PATH"; Flags: unchecked
 
 [Files]
 Source: "{#ExeDir}\pl2pl.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\components\bin\*.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 

@@ -6,6 +6,10 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 pkg="$(mktemp -d)/pl2pl_${ver}_${arch}"
 mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/pl2pl" "$pkg/usr/share/applications"
 install -m 0755 "$bin" "$pkg/usr/bin/pl2pl"
+# 取り込んだ変換器(あれば)。pl2pl web は ../lib/pl2pl を探す。環境変数 CONVERTERS_DIR=components/bin
+if [ -n "${CONVERTERS_DIR:-}" ] && ls "$CONVERTERS_DIR"/* >/dev/null 2>&1; then
+  mkdir -p "$pkg/usr/lib/pl2pl"; install -m 0755 "$CONVERTERS_DIR"/* "$pkg/usr/lib/pl2pl/"
+fi
 install -m 0644 "$root/README.md" "$root/LICENSE" "$pkg/usr/share/doc/pl2pl/"
 cat > "$pkg/usr/share/applications/pl2pl.desktop" <<EOF
 [Desktop Entry]

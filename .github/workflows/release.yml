@@ -40,6 +40,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: "${{ matrix.target }}" }
       - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: 取り込んだ変換器(cobol_to・java_to)をビルド
+        shell: bash
+        run: bash installer/build-converters.sh ${{ matrix.target }}
       - name: Inno Setup
         shell: pwsh
         run: |
@@ -52,6 +55,7 @@ jobs:
         run: |
           $d = "$env:RUNNER_TEMP\jt"
           Start-Process dist\pl2pl-Setup-${{ matrix.arch }}.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER","/DIR=$d" -Wait
+          if (-not (Test-Path "$d\java_to.exe") -or -not (Test-Path "$d\cobol_to.exe")) { throw "bundled converters missing" }
           & "$d\pl2pl.exe" omp tests\samples\hpc --out "$env:RUNNER_TEMP\out"
           if (-not (Select-String -Path "$env:RUNNER_TEMP\out\vec.c" -Pattern "omp parallel for" -Quiet)) { throw "conversion failed" }
           Start-Process "$d\unins000.exe" -ArgumentList "/VERYSILENT" -Wait
@@ -73,16 +77,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
+      - name: 取り込んだ変換器の依存とビルド
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libwayland-dev libxkbcommon-dev
+          bash installer/build-converters.sh
       - name: Package
         run: |
           ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
-          bash installer/build-deb.sh target/release/pl2pl "$ver" ${{ matrix.arch }} dist
-          tar czf "dist/pl2pl-$ver-linux-${{ matrix.arch }}.tar.gz" -C target/release pl2pl -C ../.. README.md LICENSE
+          CONVERTERS_DIR=components/bin bash installer/build-deb.sh target/release/pl2pl "$ver" ${{ matrix.arch }} dist
+          tar czf "dist/pl2pl-$ver-linux-${{ matrix.arch }}.tar.gz" -C target/release pl2pl -C ../../components/bin cobol_to java_to -C ../.. README.md LICENSE
       - name: Smoke test (install, run, remove)
         run: |
           sudo dpkg -i dist/*.deb
           pl2pl omp tests/samples/hpc --out "$RUNNER_TEMP/out"
           grep -q "omp parallel for" "$RUNNER_TEMP/out/vec.c"
+          # 同梱の java_to で変換できること(PATH には java_to を置いていない)
+          test -x /usr/lib/pl2pl/java_to && ! command -v java_to
+          mkdir -p "$RUNNER_TEMP/j" && printf 'public class A { }\n' > "$RUNNER_TEMP/j/A.java"
+          pl2pl web "$RUNNER_TEMP/j" --out "$RUNNER_TEMP/jo"
+          test -d "$RUNNER_TEMP/jo/java"
           sudo dpkg -r pl2pl
           hash -r; test ! -e /usr/bin/pl2pl
       - uses: actions/upload-artifact@v4
@@ -103,15 +116,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: "${{ matrix.target }}" }
       - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: 取り込んだ変換器をビルド
+        run: bash installer/build-converters.sh ${{ matrix.target }}
       - name: Package (.pkg, unsigned)
         run: |
           ver="${GITHUB_REF_NAME#v}"; case "$ver" in [0-9]*) ;; *) ver=0.0.0;; esac
-          bash installer/build-pkg.sh target/${{ matrix.target }}/release/pl2pl "$ver" ${{ matrix.arch }} dist
+          CONVERTERS_DIR=components/bin bash installer/build-pkg.sh target/${{ matrix.target }}/release/pl2pl "$ver" ${{ matrix.arch }} dist
       - name: Smoke test (install, run)
         run: |
           sudo installer -pkg dist/*.pkg -target /
           /usr/local/bin/pl2pl omp tests/samples/hpc --out "$RUNNER_TEMP/out"
           grep -q "omp parallel for" "$RUNNER_TEMP/out/vec.c"
+          test -x /usr/local/lib/pl2pl/java_to
+          mkdir -p "$RUNNER_TEMP/j" && printf 'public class A { }\n' > "$RUNNER_TEMP/j/A.java"
+          /usr/local/bin/pl2pl web "$RUNNER_TEMP/j" --out "$RUNNER_TEMP/jo"
+          test -d "$RUNNER_TEMP/jo/java"
       - uses: actions/upload-artifact@v4
         with: { name: "macos-${{ matrix.arch }}", path: dist/*.pkg }
 
