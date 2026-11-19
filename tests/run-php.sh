@@ -98,6 +98,8 @@ assert "<i>out</i>" in ex.text and "<i>in</i>" not in ex.text and "checked" in e
 assert '<script src="/x.js"></script>' in ex.text and ex.text.index("/x.js") > ex.text.index("n=2"), ex.text
 assert "var d = {&#34;a&#34;: 1}" in ex.text or 'var d = {"a": 1}' in ex.text or "var d = {" in ex.text, ex.text
 assert "<i>in</i>" in c.get("/extras", headers={"Authorization": "Bearer z"}).text
+ps = c.get("/phpset")
+assert ps.status_code == 200 and "<p>sum=7</p>" in ps.text and "<p>hi</p>" in ps.text, ps.text
 assert "<u>cannot</u>" in ex.text and "<u>can</u>" not in ex.text, ex.text
 cp = c.get("/comp")
 assert cp.status_code == 200 and 'class="alert error"' in cp.text and 'class="alert info"' in cp.text, cp.text

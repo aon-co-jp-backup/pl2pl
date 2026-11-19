@@ -274,6 +274,17 @@ fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
     s
 }
 
+/// `$a = 1; $b = $a + 1;` → `{% set a = 1 %}{% set b = a + 1 %}`。代入以外の文が1つでもあれば None。
+fn php_sets(code: &str) -> Option<String> {
+    let re = Regex::new(r"(?s)^\$(\w+)\s*=\s*(.+)$").unwrap();
+    let mut out = String::new();
+    for st in code.split(';').map(|x| x.trim()).filter(|x| !x.is_empty()) {
+        let c = re.captures(st)?;
+        out.push_str(&format!("{{% set {} = {} %}}", &c[1], jexpr(&c[2]).ok()?));
+    }
+    Some(out)
+}
+
 pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
     // 1) コメント・出力
     let s = Regex::new(r"(?s)\{\{--(.*?)--\}\}").unwrap().replace_all(src, "{#$1#}").to_string();
@@ -331,7 +342,7 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
         out.push_str(&s3[i..m.start()]);
         let after = m.end();
         let has_paren = s3[after..].starts_with('(');
-        let (arg, end) = if has_paren {
+        let (arg, mut end) = if has_paren {
             match matching_paren(&s3, after) {
                 Some(c) => (s3[after + 1..c].to_string(), c + 1),
                 None => (String::new(), after),
@@ -518,6 +529,24 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
                 warn.push(format!("{name}:{line} @{dname}: FastAPI に CSRF/メソッド偽装の仕組みは無いため出力しない(必要なら別途実装)"));
                 out.push_str(&format!("{{# pl2pl: @{dname} は出力しない #}}"));
             }
+            "php" => {
+                // `@php($x = 1)` / `@php $a = 1; $b = $a + 1; @endphp`。代入だけなら `{% set %}` にする
+                let (code, new_end) = if has_paren {
+                    (arg.clone(), end)
+                } else {
+                    match s3[end..].find("@endphp") {
+                        Some(k) => (s3[end..end + k].to_string(), end + k + "@endphp".len()),
+                        None => (String::new(), end),
+                    }
+                };
+                match php_sets(&code) {
+                    Some(sets) if !code.trim().is_empty() => {
+                        out.push_str(&sets);
+                        end = new_end;
+                    }
+                    _ => fail!("代入以外の PHP コードは変換できません"),
+                }
+            }
             n if todo_names.contains(&n) => fail!("未対応のディレクティブ"),
             _ => {
                 // @media など Blade でないもの
@@ -587,6 +616,8 @@ mod tests {
         let o = convert("@forelse($a as $k => $v){{ $k }}@empty none @endforelse @php echo 1; @endphp a@b.com", "y", &mut w);
         assert!(o.contains("{% for k, v in a.items() %}") && o.contains("{% else %}") && o.contains("{% endfor %}"), "{o}");
         assert!(o.contains("TODO(pl2pl): @php") && o.contains("a@b.com"));
+        let ph = convert("@php $a = 1; $b = $a + 2; @endphp{{ $b }} @php($c = 'x'){{ $c }}", "p", &mut w);
+        assert!(ph.contains("{% set a = 1 %}{% set b = a + 2 %}") && ph.contains("{% set c = 'x' %}") && !ph.contains("TODO"), "{ph}");
         assert!(!w.is_empty());
         assert_eq!(out_path("resources/views/users/index.blade.php"), "users/index.html");
     }

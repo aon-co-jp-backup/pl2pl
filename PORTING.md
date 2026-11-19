@@ -16,7 +16,7 @@
 3. `watch` を本物の新しい版で試した: fastapi 0.165.0(starlette 1.10)で `tests/run-php.sh` が 49 件成功したので、registry の tested を 0.165 へ進めた。残り: laravel 13 / django 6.1 / spring-boot 4.1 の新版は、通し試験が実物のフレームワークを使わないため「未検証」のまま(実物を使う試験を作るまで報告のみ)。
 4. 毎晩・毎朝の自動実行の登録(この PC では確認コマンドが動かず誤報になるので未登録。登録の例は `scripts/pl2pl-watch.cmd` の先頭)。
 5. (済み)easy-web.tokyo のトップページに pl2pl の紹介カードを足し、本番(VPS の open-easy-web)へ反映しました。open-easy-web `95cb1e7`、旧バイナリは `server/target/release/open-easy-web-server.before-pl2pl-card-20261119`。
-6. PHP: クラスで作る Blade の部品・`$attributes`・`@php`・`morphToMany`。
+6. PHP(一部済み): Blade の `@php`(代入だけの文・`@php($x = 1)`)は `{% set %}` に変換するようにした(通し試験 50 件)。残り: クラスで作る Blade の部品・`$attributes`・`morphToMany`、代入以外の `@php` はこれまでどおり TODO。
 7. aruaru-llm との連携(`llm setup` の実導入は未確認)。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行。
 8. 元の COBOL_to・Java_to の削除(**取り返しがつかないので、最後の確認を取ってから**)。
 9. `docs/DESIGN.md` は持ち主が書く。`docs/LANGUAGES.md` は 2026-11-19 に中身を見直し、いまの状態(Java・COBOL は変換器あり)と食い違いはなかった(ただし知識ベースの一覧で、検索による最新性の確認はまだ)。

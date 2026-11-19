@@ -48,6 +48,7 @@ Route::post('/posts/{id}/comments', [UserController::class, 'addComment']);
 Route::get('/cursored', [UserController::class, 'cursored']);
 Route::get('/extras', [UserController::class, 'extras']);
 Route::get('/comp', [UserController::class, 'comp']);
+Route::get('/phpset', fn() => view('phpset'));
 Route::post('/posts/{id}/notes', [UserController::class, 'addNote']);
 Route::get('/posts/{id}/notes', [UserController::class, 'postNotes']);
 Route::get('/notes/{id}/owner', [UserController::class, 'noteOwner']);
