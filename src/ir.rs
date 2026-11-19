@@ -176,6 +176,33 @@ pub fn to_openapi(eps: &[Endpoint]) -> String {
     format!("{{\n  \"openapi\": \"3.0.3\",\n  \"info\": {{\"title\": \"pl2pl ir\", \"version\": \"0.1.0\"}},\n  \"paths\": {{\n{}\n  }}\n}}\n", body.join(",\n"))
 }
 
+/// 出力側 3: FastAPI の骨組み。本体は IR に無いので TODO を残す(黙って作り話をしない)。同じ関数名は連番にする。
+pub fn to_fastapi(eps: &[Endpoint]) -> String {
+    let mut out = String::from("from fastapi import FastAPI\n\napp = FastAPI()\n");
+    let mut used: Vec<String> = vec![];
+    for e in eps.iter().filter(|e| ["get", "post", "put", "patch", "delete"].contains(&e.verb.as_str())) {
+        let (path, ps) = split_params(&e.path);
+        let mut base: String = e.name.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+        const KW: &[&str] = &["False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"];
+        if base.is_empty() || base.starts_with(|c: char| c.is_ascii_digit()) {
+            base = format!("route_{base}");
+        }
+        if KW.contains(&base.as_str()) {
+            base.push('_');
+        }
+        let mut name = base.clone();
+        let mut n = 2;
+        while used.contains(&name) {
+            name = format!("{base}_{n}");
+            n += 1;
+        }
+        used.push(name.clone());
+        let args: Vec<String> = ps.iter().map(|(p, t)| format!("{p}: {}", match *t { "integer" => "int", "number" => "float", _ => "str" })).collect();
+        out.push_str(&format!("\n\n@app.{}({})\ndef {}({}):\n    # TODO(pl2pl): 本体は未変換です({}:{})\n    raise NotImplementedError\n", e.verb, q(&path), name, args.join(", "), e.source, e.line));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +260,13 @@ public class S extends HttpServlet {
 }}
 "));
         assert!(e.iter().any(|x| x.path == "/hi/{name}") && e.iter().any(|x| x.verb == "post" && x.path == "/add"), "{e:?}");
+    }
+
+    #[test]
+    fn fastapi_backend() {
+        let eps = vec![ep("get", "/u/{int:id}", "show", "a.py", 3), ep("post", "/u", "show", "a.py", 9), ep("delete", "/x", "9bad-name", "a.py", 12), ep("get", "/l", "lambda", "a.py", 15)];
+        let f = to_fastapi(&eps);
+        assert!(f.contains("@app.get(\"/u/{id}\")") && f.contains("def show(id: int):") && f.contains("def show_2():") && f.contains("def route_9bad_name():") && f.contains("def lambda_():"), "{f}");
     }
 
     #[test]

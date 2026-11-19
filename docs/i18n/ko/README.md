@@ -14,6 +14,7 @@
 |---|---|
 | `pl2pl php` | PHP(Laravel / Symfony) → FastAPI. 자세한 내용은 [PHP.md](../../PHP.md)(일본어) |
 | `pl2pl web` | 폴더를 살펴 Java, COBOL, PHP, Flask/Django를 스스로 알아보고 알맞은 변환기로 보냄 |
+| `pl2pl ir` | (시험 단계) PHP·Python·Java의 라우트를 공통 형태로 바꿔 JSON, OpenAPI, FastAPI 뼈대로 출력 |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL(Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | C/C++ 반복문을 OpenMP, Kokkos, GPU용으로 고침(gpu는 시험 단계) |
 | `pl2pl cport` | UNIX용 C 코드를 Windows와 Linux 모두에서 돌아가게 함 |

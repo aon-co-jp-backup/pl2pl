@@ -15,6 +15,7 @@
 |---|---|
 | `pl2pl php` | PHP(Laravel / Symfony)→ FastAPI。くわしくは [docs/PHP.md](docs/PHP.md) |
 | `pl2pl web` | フォルダを調べて、Java・COBOL・PHP・Flask/Django を自動で見分け、合う変換器に回す |
+| `pl2pl ir` | (試作)PHP・Python・Java のルートを共通の形にして、JSON・OpenAPI・FastAPI の骨組みへ |
 | `pl2pl cobol` | COBOL+JCL → GnuCOBOL(Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | C/C++ の繰り返し処理を、OpenMP・Kokkos・GPU用に変える(gpu は試作) |
 | `pl2pl cport` | UNIX 用の C を、WindowsでもLinuxでも動く形へ |

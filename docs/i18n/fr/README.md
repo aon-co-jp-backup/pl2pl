@@ -14,6 +14,7 @@ Par exemple, un site en PHP (Laravel) devient un site en Python (FastAPI). Il fo
 |---|---|
 | `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. Détails : [PHP.md](../../PHP.md) (en japonais) |
 | `pl2pl web` | Examine un dossier, reconnaît seul Java, COBOL, PHP et Flask/Django, et passe chaque partie au bon convertisseur |
+| `pl2pl ir` | (prototype) Met les routes PHP, Python et Java sous une forme commune, puis écrit du JSON, de l'OpenAPI ou un squelette FastAPI |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL (Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | Réécrit les boucles C/C++ pour OpenMP, Kokkos ou le GPU (gpu est un prototype) |
 | `pl2pl cport` | Fait fonctionner du C pour UNIX sous Windows comme sous Linux |

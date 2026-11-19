@@ -14,6 +14,7 @@
 |---|---|
 | `pl2pl php` | PHP(Laravel / Symfony)→ FastAPI。詳情見 [PHP.md](../../PHP.md)(日文) |
 | `pl2pl web` | 檢查資料夾,自動辨識 Java、COBOL、PHP、Flask/Django,再交給合適的轉換器 |
+| `pl2pl ir` | (試作)把 PHP、Python、Java 的路由變成共同的形式,再輸出 JSON、OpenAPI 或 FastAPI 骨架 |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL(Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | 把 C/C++ 的迴圈改寫成 OpenMP、Kokkos 或 GPU 版本(gpu 為試作) |
 | `pl2pl cport` | 讓 UNIX 的 C 程式碼在 Windows 和 Linux 上都能執行 |

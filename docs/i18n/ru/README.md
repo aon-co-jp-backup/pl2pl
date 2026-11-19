@@ -14,6 +14,7 @@
 |---|---|
 | `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. Подробности: [PHP.md](../../PHP.md) (на японском) |
 | `pl2pl web` | Просматривает папку, сам определяет Java, COBOL, PHP и Flask/Django и передаёт каждое подходящему конвертеру |
+| `pl2pl ir` | (прототип) Приводит маршруты PHP, Python и Java к общему виду и записывает JSON, OpenAPI или заготовку FastAPI |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL (Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | Переписывает циклы C/C++ под OpenMP, Kokkos или GPU (gpu — прототип) |
 | `pl2pl cport` | Делает так, чтобы C-код для UNIX работал и в Windows, и в Linux |

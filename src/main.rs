@@ -34,7 +34,7 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl config [llm <auto|off|モデルID>]        LLM の自動導入を外す(off)/ 既定(auto)/ モデル固定。PL2PL_NO_LLM=1 でも外せる
   pl2pl watch [--registry F] [--repo DIR] [--vc version-control] [--dry-run]
                                               言語・FWの新版を検知→通し試験→自動追従→version-controlで修正→メール/LINE通知(毎晩・毎朝に実行)
-  pl2pl ir <dir> --out <dir> [--format json|openapi]   (試作)共通の中間表現: PHP・Python・Java のルートを JSON / OpenAPI へ
+  pl2pl ir <dir> --out <dir> [--format json|openapi|fastapi]   (試作)共通の中間表現: PHP・Python・Java のルートを JSON / OpenAPI へ
   pl2pl --version
 ";
 
@@ -127,7 +127,7 @@ fn main() {
         if !silent.is_empty() {
             println!("pl2pl ir: ルートを検出しなかったファイル {} 件(ルートが無いか、未対応の書き方): {}", silent.len(), silent.iter().take(5).cloned().collect::<Vec<_>>().join(", "));
         }
-        let (name, text) = if fmt == "openapi" { ("openapi.json", ir::to_openapi(&eps)) } else { ("ir.json", ir::to_json(&eps)) };
+        let (name, text) = match fmt.as_str() { "openapi" => ("openapi.json", ir::to_openapi(&eps)), "fastapi" => ("main.py", ir::to_fastapi(&eps)), _ => ("ir.json", ir::to_json(&eps)) };
         let _ = util::write(&out, Path::new(name), &text);
         println!("pl2pl ir: {} 件のルート → {}/{}", eps.len(), out.display(), name);
         return;
