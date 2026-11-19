@@ -39,6 +39,20 @@ pub struct Relation {
     pub pivot: String,
 }
 
+/// テンプレート(画面)。入力側(Blade)が `name`(論理名: users/index.html)と中身を作り、出力側が書き出す。
+/// 中身は変換済みの Jinja2 で、分からない所は `{# TODO(pl2pl): ... #}` として残る(ノード木までは作っていない)。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Template {
+    pub name: String,
+    pub source: String,
+    pub text: String,
+}
+
+/// 入力側: Blade(`*.blade.php`)
+pub fn from_blade(files: &[(String, String)], warn: &mut Vec<String>) -> Vec<Template> {
+    files.iter().map(|(n, src)| Template { name: crate::blade::out_path(n), source: n.clone(), text: crate::blade::convert(src, n, warn) }).collect()
+}
+
 /// ミドルウェア(FastAPI の `Depends` にする依存)。コードは変換済みの Python。
 #[derive(Debug, Clone, PartialEq)]
 pub struct Middleware {

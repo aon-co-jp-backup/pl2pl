@@ -1,5 +1,5 @@
 //! IR の出力側(FastAPI + SQLAlchemy): モデル(db.py・models.py)とミドルウェア(middleware.py)を書き出す。
-use crate::ir::{Middleware, Model, Relation};
+use crate::ir::{Middleware, Model, Relation, Template};
 
 pub const DB_PY: &str = r##""""pl2pl が生成した DB 層(SQLAlchemy)。接続先は環境変数 DATABASE_URL(既定は SQLite のファイル)。"""
 import os
@@ -471,3 +471,8 @@ def throttle(limit: int = 60, minutes: int = 1, name: str = "default"):
 
 "##;
 
+
+/// 出力側: テンプレート(Jinja2)。`templates/` の下へ置く。
+pub fn templates(ts: &[Template]) -> Vec<(String, String)> {
+    ts.iter().map(|t| (format!("templates/{}", t.name), t.text.clone())).collect()
+}
