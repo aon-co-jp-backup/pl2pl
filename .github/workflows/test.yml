@@ -37,3 +37,6 @@ jobs:
           "$HOME/2fa-venv/bin/pip" install --quiet fastapi httpx sqlalchemy jinja2
       - name: PHP → FastAPI の通し試験
         run: B="$PWD/target/release/pl2pl" bash tests/run-php.sh
+      - name: 新版の検知(毎晩・毎朝の実行のみ。差があればログに出る)
+        if: github.event_name == 'schedule' && matrix.os == 'ubuntu-latest'
+        run: ./target/release/pl2pl watch --dry-run
