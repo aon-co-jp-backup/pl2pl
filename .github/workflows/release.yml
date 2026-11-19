@@ -21,7 +21,7 @@ jobs:
       - name: Tools (GnuCOBOL, gcc, fastapi)
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends gnucobol gcc
-          pip install fastapi httpx
+          pip install fastapi httpx sqlalchemy jinja2
       - name: End-to-end (COBOL+JCL run, OpenMP same result, cport, PHP to FastAPI)
         run: bash tests/ci.sh
 
