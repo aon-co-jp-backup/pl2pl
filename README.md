@@ -43,7 +43,7 @@ pl2pl web ./project --target fastapi --out ./out
 - テストは、小さなサンプルだけです。大きな本物のプログラムでは、まだ試していません。
 
 ## これから
-- PHP: `@can`(権限)と、クラスで作る Blade 部品。
+- PHP: クラスで作る Blade 部品。
 - 共通の中間表現(IR)を作り、言語×言語の組み合わせを一気に増やす。
 - 実際のメール通知・AIによる自動修正の確認。
 - GPU での実行確認(open-cuda / open-directx)。

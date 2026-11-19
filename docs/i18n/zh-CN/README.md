@@ -42,7 +42,7 @@ pl2pl web ./project --target fastapi --out ./out
 - 目前只在小型示例上测试过,还没有在大型真实程序上试过。
 
 ## 接下来
-- PHP:`@can`(权限)和用类编写的 Blade 组件。
+- PHP: 用类编写的 Blade 组件.
 - 共同的中间表示(IR),一次性增加更多语言组合。
 - 确认真实的邮件通知和 AI 自动修复。
 - 在 GPU 上运行(open-cuda / open-directx)。

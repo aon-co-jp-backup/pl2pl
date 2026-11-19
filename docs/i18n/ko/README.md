@@ -42,7 +42,7 @@ pl2pl web ./project --target fastapi --out ./out
 - 작은 예제로만 시험했고, 크고 실제적인 프로그램에서는 아직 시험하지 못했습니다.
 
 ## 앞으로
-- PHP: `@can`(권한)과 클래스로 만든 Blade 컴포넌트.
+- PHP: 클래스로 만든 Blade 컴포넌트.
 - 공통 중간 표현(IR)을 만들어 언어 조합을 한꺼번에 늘리기.
 - 실제 이메일 알림과 AI 자동 수정 확인.
 - GPU에서 실행 확인(open-cuda / open-directx).

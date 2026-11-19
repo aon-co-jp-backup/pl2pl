@@ -13,7 +13,7 @@
 2. `watch` の対象を「本物の新しい版」で試す(laravel・symfony・spring-boot・flask・django・poem はまだ未検証扱い)。
 3. 毎晩・毎朝の登録(`schtasks /Create` など。本人の環境の設定なので未実行)。
 4. 共通の中間表現(IR)の試作。言語×言語の組み合わせを増やす土台です。
-5. PHP: `@can`・クラスで作る Blade 部品・`$attributes`・`@php`・`morphToMany`。
+5. PHP: クラスで作る Blade 部品・`$attributes`・`@php`・`morphToMany`。
 6. aruaru-llm との連携(`llm setup` の実導入は未確認)。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行。
 7. 元の COBOL_to・Java_to の削除(**元に戻せないので、最終確認を取ってから**)。
 8. `docs/DESIGN.md` は所有者が書く。`docs/LANGUAGES.md` が古くないか確認。

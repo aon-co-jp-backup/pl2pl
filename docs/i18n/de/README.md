@@ -42,7 +42,7 @@ pl2pl web ./project --target fastapi --out ./out
 - Getestet wurde bisher nur mit kleinen Beispielen, noch nicht mit großen echten Programmen.
 
 ## Als Nächstes
-- PHP: `@can` (Berechtigungen) und Blade-Komponenten als Klassen.
+- PHP: Blade-Komponenten als Klassen.
 - Eine gemeinsame Zwischendarstellung (IR), damit viele weitere Sprachpaare auf einmal möglich werden.
 - Prüfen, ob E-Mail-Benachrichtigung und automatische Reparatur durch KI wirklich funktionieren.
 - Ausführung auf der GPU (open-cuda / open-directx).

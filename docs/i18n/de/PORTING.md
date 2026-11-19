@@ -15,7 +15,7 @@
 2. `watch` mit echten neuen Versionen ausprobieren (laravel, symfony, spring-boot, flask, django und poem gelten noch als ungeprüft).
 3. Den nächtlichen und morgendlichen Lauf einrichten (`schtasks /Create` usw.; noch nicht getan, weil es die eigene Umgebung des Eigentümers betrifft).
 4. Prototyp der gemeinsamen Zwischendarstellung (IR) – die Grundlage für viele weitere Sprachpaare.
-5. PHP: `@can`, Blade-Komponenten als Klassen, `$attributes`, `@php`, `morphToMany`.
+5. PHP: Blade-Komponenten als Klassen, `$attributes`, `@php`, `morphToMany`.
 6. Anbindung an aruaru-llm (die echte Installation per `llm setup` ist ungeprüft). Kokkos auf der GPU; Kernel auf open-cuda / open-directx.
 7. Die ursprünglichen COBOL_to und Java_to löschen (**nicht rückgängig zu machen – vorher endgültige Bestätigung einholen**).
 8. `docs/DESIGN.md` schreibt der Eigentümer. Prüfen, ob `docs/LANGUAGES.md` noch aktuell ist.

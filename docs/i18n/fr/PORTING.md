@@ -15,7 +15,7 @@
 2. Essayer `watch` avec de vraies nouvelles versions (laravel, symfony, spring-boot, flask, django et poem restent « non vérifiés »).
 3. Enregistrer les exécutions du soir et du matin (`schtasks /Create`, etc. ; pas encore fait, car c'est la configuration personnelle du propriétaire).
 4. Prototype de la représentation intermédiaire commune (IR), base pour ajouter beaucoup de paires de langages.
-5. PHP : `@can`, composants Blade en classes, `$attributes`, `@php`, `morphToMany`.
+5. PHP : composants Blade écrits sous forme de classes, `$attributes`, `@php`, `morphToMany`.
 6. Liaison avec aruaru-llm (l'installation réelle par `llm setup` n'est pas vérifiée). Kokkos sur GPU ; noyaux sur open-cuda / open-directx.
 7. Supprimer les COBOL_to et Java_to d'origine (**irréversible : demander d'abord une confirmation finale**).
 8. Le propriétaire écrit `docs/DESIGN.md`. Vérifier que `docs/LANGUAGES.md` n'est pas périmé.

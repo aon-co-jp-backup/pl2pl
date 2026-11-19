@@ -474,7 +474,22 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
                 out.push_str(&format!("{{% if {c} %}}"));
                 stack.push("other");
             }
-            "endauth" | "endguest" | "endswitch" => {
+            "can" | "cannot" | "canany" => {
+                // 権限判定は本物の認可(Gate/Policy)の代わりに request.state.abilities(文字列の一覧)を見る。無ければ全て拒否。
+                let names: Vec<String> = regex::Regex::new(r#"['"]([^'"]+)['"]"#).unwrap().captures_iter(&arg).map(|c| c[1].to_string()).collect();
+                let names = if dname == "canany" { names } else { names.into_iter().take(1).collect() };
+                if names.is_empty() {
+                    fail!("権限名が文字列でないため変換できません");
+                    out.push_str("{% if false %}");
+                } else {
+                    warn.push(format!("{name}:{line} @{dname}: 簡易判定(request.state.abilities に権限名の一覧を入れる。無ければ全て拒否)。Gate/Policy へ差し替えること"));
+                    let has: Vec<String> = names.iter().map(|n| format!("'{n}' in request.state.abilities")).collect();
+                    let c = if dname == "cannot" { format!("not ({})", has.join(" or ")) } else { has.join(" or ") };
+                    out.push_str(&format!("{{% if {c} %}}"));
+                }
+                stack.push("other");
+            }
+            "endauth" | "endguest" | "endswitch" | "endcan" | "endcannot" | "endcanany" => {
                 stack.pop();
                 out.push_str("{% endif %}");
             }
@@ -534,6 +549,14 @@ mod tests {
         let mut w2 = vec![];
         convert("@push('a')x@endpush @push('a')y@endpush", "t", &mut w2);
         assert!(w2.iter().any(|x| x.contains("2回目")), "{w2:?}");
+    }
+
+    #[test]
+    fn can_family() {
+        let mut w = vec![];
+        let o = convert("@can('edit', $p) a @endcan @cannot('x') b @endcannot @canany(['p','q']) c @endcanany", "t", &mut w);
+        assert!(o.contains("{% if 'edit' in request.state.abilities %} a {% endif %}"), "{o}");
+        assert!(o.contains("not ('x' in request.state.abilities)") && o.contains("'p' in request.state.abilities or 'q' in request.state.abilities"), "{o}");
     }
 
     #[test]

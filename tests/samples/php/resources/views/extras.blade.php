@@ -19,6 +19,7 @@
 @endguest
 <input @checked($n == 2)>
 <script>var d = @json($data);</script>
+@can("edit")<u>can</u>@endcan @cannot("edit")<u>cannot</u>@endcannot
 @endsection
 @push('scripts')
 <script src="/x.js"></script>

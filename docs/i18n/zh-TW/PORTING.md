@@ -15,7 +15,7 @@
 2. 用真正的新版本試 `watch`(laravel、symfony、spring-boot、flask、django、poem 目前仍算「未驗證」)。
 3. 登記每晚和每早的執行(`schtasks /Create` 等;這是擁有者自己的環境設定,尚未執行)。
 4. 試作共同的中介表示(IR),作為增加更多語言組合的基礎。
-5. PHP:`@can`、用類別撰寫的 Blade 元件、`$attributes`、`@php`、`morphToMany`。
+5. PHP:用類別撰寫的 Blade 元件、`$attributes`、`@php`、`morphToMany`。
 6. 與 aruaru-llm 整合(`llm setup` 的實際安裝未驗證)。Kokkos 的 GPU 執行;在 open-cuda / open-directx 上執行核心。
 7. 刪除原本的 COBOL_to 和 Java_to(**無法復原,須先取得最終確認**)。
 8. `docs/DESIGN.md` 由擁有者撰寫。確認 `docs/LANGUAGES.md` 沒有過時。

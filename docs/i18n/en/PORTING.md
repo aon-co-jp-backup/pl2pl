@@ -15,7 +15,7 @@
 2. Try `watch` against real new versions (laravel, symfony, spring-boot, flask, django, poem still count as unverified).
 3. Register the nightly and morning runs (`schtasks /Create` etc.; not done, because it is the owner's own setup).
 4. Prototype the shared intermediate representation (IR), the base for adding many language pairs.
-5. PHP: `@can`, class-based Blade components, `$attributes`, `@php`, `morphToMany`.
+5. PHP: Blade components written as classes, `$attributes`, `@php`, `morphToMany`.
 6. aruaru-llm integration (a real `llm setup` install is unverified). Kokkos on GPU; kernels on open-cuda / open-directx.
 7. Delete the original COBOL_to and Java_to (**irreversible: ask for final confirmation first**).
 8. The owner writes `docs/DESIGN.md`. Check that `docs/LANGUAGES.md` is not out of date.

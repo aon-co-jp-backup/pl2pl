@@ -15,7 +15,7 @@
 2. 진짜 새 버전으로 `watch` 시험(laravel, symfony, spring-boot, flask, django, poem은 아직 미검증으로 취급).
 3. 매일 밤·아침 실행 등록(`schtasks /Create` 등. 소유자 본인의 환경 설정이라 아직 하지 않음).
 4. 공통 중간 표현(IR) 시제품. 언어 조합을 늘리는 토대입니다.
-5. PHP: `@can`, 클래스로 만든 Blade 컴포넌트, `$attributes`, `@php`, `morphToMany`.
+5. PHP: 클래스로 만든 Blade 컴포넌트, `$attributes`, `@php`, `morphToMany`.
 6. aruaru-llm 연동(`llm setup` 실제 설치는 미확인). Kokkos GPU 실행, open-cuda / open-directx에서 커널 실행.
 7. 원래의 COBOL_to와 Java_to 삭제(**되돌릴 수 없으니 마지막 확인을 받은 뒤에**).
 8. `docs/DESIGN.md`는 소유자가 씁니다. `docs/LANGUAGES.md`가 오래되지 않았는지 확인.

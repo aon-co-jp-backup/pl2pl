@@ -42,7 +42,7 @@ pl2pl web ./project --target fastapi --out ./out
 - Só foi testado com exemplos pequenos, ainda não com programas grandes e reais.
 
 ## Próximos passos
-- PHP: `@can` (permissões) e componentes Blade escritos como classes.
+- PHP: componentes Blade escritos como classes.
 - Uma representação intermediária comum (IR) para acrescentar de uma vez muitos pares de linguagens.
 - Verificar o envio real de e-mails e a correção automática por IA.
 - Execução na GPU (open-cuda / open-directx).
