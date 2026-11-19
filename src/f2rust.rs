@@ -1,8 +1,16 @@
 //! `pl2pl f2rust`: とても単純な Fortran(program、integer / real、do、if、print *)を Rust へ書き換える最初の一歩。
 //! わからない行は黙って捨てず `// TODO(f2rust): 元の行` として残し、レポートにも載せる。
 //! 配列・subroutine/function・module・書式付き出力・`**` は未対応(TODO のまま)。
-//! 注意: Fortran の `print *` は先頭に空白が付くなど書式が違う。ここでは項目を空白 1 個でつなぐ近似で、実機(gfortran)との出力一致は未確認。
+//! `print *` は gfortran に合わせる(各項目の前に空白 1 個、整数は幅 11)。小数(real)の桁数は近似で、gfortran と一致するのは整数と文字列。
 use regex::Regex;
+
+thread_local! { static INTS: std::cell::RefCell<std::collections::HashSet<String>> = Default::default(); }
+
+/// 整数だけの式か(変数が integer と宣言済み、または整数リテラル)。gfortran の `print *` は整数を幅 11 で出す。
+fn is_int_expr(e: &str) -> bool {
+    let ids: Vec<String> = Regex::new(r"[A-Za-z_]\w*").unwrap().find_iter(e).map(|m| m.as_str().to_string()).collect();
+    !e.contains('.') && INTS.with(|s| ids.iter().all(|i| s.borrow().contains(i)))
+}
 
 fn ops(e: &str) -> String {
     let mut s = e.to_string();
@@ -50,6 +58,7 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
     let print = Regex::new(r"(?i)^print\s*\*\s*,\s*(.+)$").unwrap();
     let assign = Regex::new(r"^\w+\s*=\s*[^=].*$").unwrap();
     let mut out = String::from("// pl2pl f2rust で変換(最初の一歩)。TODO(f2rust) の行は手で直してください。\n#![allow(unused_mut, unused_variables, unused_parens)]\n\n");
+    INTS.with(|s| s.borrow_mut().clear());
     let mut depth = 0usize;
     let mut todo = 0;
     for (i, raw) in src.lines().enumerate() {
@@ -89,21 +98,29 @@ pub fn convert(src: &str, name: &str, rep: &mut Vec<String>) -> Vec<(String, Str
                     rep.push(format!("{name}:{}: 配列は未対応 `{l}`", i + 1));
                     break;
                 }
+                if t == "i32" {
+                    INTS.with(|s| s.borrow_mut().insert(n.clone()));
+                }
                 out.push_str(&format!("{ind}let mut {n}: {t} = {init};\n"));
             }
         } else if let Some(c) = print.captures(l) {
-            let items = split_commas(&c[1]);
-            let (mut f, mut a) = (vec![], vec![]);
-            for it in items {
+            // gfortran の `print *`: 各項目の前に空白 1 個、整数は幅 11、文字列はそのまま(実機 gfortran 16 で確認)
+            let (mut f, mut a) = (String::new(), vec![]);
+            for it in split_commas(&c[1]) {
                 let it = it.trim();
-                if (it.starts_with('\'') && it.ends_with('\'') || it.starts_with('"') && it.ends_with('"')) && it.len() >= 2 {
-                    f.push(it[1..it.len() - 1].replace('{', "{{").replace('}', "}}"));
+                if (it.starts_with(char::from(39)) && it.ends_with(char::from(39)) || it.starts_with('"') && it.ends_with('"')) && it.len() >= 2 {
+                    f.push(' ');
+                    f.push_str(&it[1..it.len() - 1].replace('{', "{{").replace('}', "}}"));
+                } else if is_int_expr(it) {
+                    f.push_str(" {:>11}");
+                    a.push(ops(it));
                 } else {
-                    f.push("{}".to_string());
+                    f.push_str(" {}");
                     a.push(ops(it));
                 }
             }
-            out.push_str(&format!("{ind}println!(\"{}\"{});\n", f.join(" "), a.iter().map(|x| format!(", {x}")).collect::<String>()));
+            out.push_str(&format!("{ind}println!(\"{f}\"{});
+", a.iter().map(|x| format!(", {x}")).collect::<String>()));
         } else if assign.is_match(l) && !l.contains("**") {
             out.push_str(&format!("{ind}{};\n", ops(l)));
         } else {
@@ -128,7 +145,7 @@ mod tests {
         let mut r = vec![];
         let o = convert("program t\n  implicit none\n  integer :: i, s = 0\n  do i = 1, 3\n    s = s + i\n  end do\n  if (s .gt. 5) then\n    print *, 'sum', s\n  else\n    print *, 'small'\n  end if\nend program t\n", "t.f90", &mut r);
         let t = &o[0].1;
-        assert!(t.contains("for i in 1..=3 {") && t.contains("if s > 5 {") && t.contains("println!(\"sum {}\", s);"), "{t}");
+        assert!(t.contains("for i in 1..=3 {") && t.contains("if s > 5 {") && t.contains("println!(\" sum {:>11}\", s);"), "{t}");
         assert!(r.is_empty(), "{r:?}");
     }
     #[test]
