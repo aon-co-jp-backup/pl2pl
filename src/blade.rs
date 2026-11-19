@@ -216,6 +216,7 @@ fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
         }
         let selfclose = &m[3] == "/>";
         let mut pairs: Vec<String> = vec![];
+        let mut attrs: Vec<String> = vec![];
         let mut failed: Option<String> = None;
         for a in attr.captures_iter(&m[2]) {
             let key = a[2].replace('-', "_");
@@ -234,6 +235,7 @@ fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
                 Some(format!("{:?}", val))
             };
             if let Some(v) = v {
+                attrs.push(format!("{:?}: {v}", &a[2]));
                 pairs.push(format!("{key}={v}"));
             }
         }
@@ -268,6 +270,9 @@ fn convert_components(src: &str, name: &str, warn: &mut Vec<String>) -> String {
             sets.push_str(&format!("{{% set slot %}}{}{{% endset %}}", rest.trim()));
         }
         let t = format!("components/{}.html", cname.replace('.', "/"));
+        if !attrs.is_empty() {
+            pairs.push(format!("attributes={{{}}}", attrs.join(", ")));
+        }
         let with = if pairs.is_empty() { String::new() } else { format!("{} ", pairs.join(", ")) };
         s.replace_range(start..end, &format!("{{% with {with}%}}{sets}{{% include \"{t}\" %}}{{% endwith %}}"));
     }
@@ -285,7 +290,48 @@ fn php_sets(code: &str) -> Option<String> {
     Some(out)
 }
 
+/// `{{ $attributes }}` / `{{ $attributes->merge(['class' => 'a', 'type' => 'b']) }}` → Jinja2(呼び出し側が渡した `attributes` 辞書を使う)。
+/// `@props` に宣言した名前(`_props`)は属性として出さない。merge は文字列の組だけ対応(class は呼び出し側の値と空白でつなぐ。ほかは呼び出し側に無いときだけ既定値)。
+/// それ以外の形は触らず、あとの処理が TODO として残す。
+fn convert_attributes(src: &str) -> String {
+    let plain = Regex::new(r"\{\{\s*\$attributes\s*\}\}").unwrap();
+    let merge = Regex::new(r"(?s)\{\{\s*\$attributes->merge\(\s*\[(.*?)\]\s*\)\s*\}\}").unwrap();
+    let pair = Regex::new(r#"^\s*['"]([\w-]+)['"]\s*=>\s*['"]([^'"{}]*)['"]\s*$"#).unwrap();
+    let rest_loop = |skip_class: bool, extra: &str| {
+        let cond = if skip_class { " and k != 'class'" } else { "" };
+        let skip = extra.to_string();
+        format!("{{% for k, v in (attributes|default({{}})).items() if k not in (_props|default([])){cond}{skip} %}} {{{{ k }}}}=\"{{{{ v }}}}\"{{% endfor %}}")
+    };
+    let s = plain.replace_all(src, |_: &regex::Captures| rest_loop(false, "")).to_string();
+    merge
+        .replace_all(&s, |c: &regex::Captures| {
+            let items = split_top_commas(&c[1]);
+            let mut defaults: Vec<(String, String)> = vec![];
+            for it in items.iter().filter(|x| !x.trim().is_empty()) {
+                match pair.captures(it) {
+                    Some(p) => defaults.push((p[1].to_string(), p[2].to_string())),
+                    None => return c[0].to_string(), // 文字列以外が混ざる形は変換しない
+                }
+            }
+            let mut out = String::new();
+            let mut skip = String::new();
+            for (k, v) in &defaults {
+                if k == "class" {
+                    out.push_str(&format!(" class=\"{v}{{% if (attributes|default({{}})).get('class') %}} {{{{ attributes.class }}}}{{% endif %}}\""));
+                } else {
+                    out.push_str(&format!("{{% if '{k}' in (attributes|default({{}})) %}} {k}=\"{{{{ attributes['{k}'] }}}}\"{{% else %}} {k}=\"{v}\"{{% endif %}}"));
+                    skip.push_str(&format!(" and k != '{k}'"));
+                }
+            }
+            let has_class = defaults.iter().any(|(k, _)| k == "class");
+            out.push_str(&rest_loop(has_class, &skip));
+            out
+        })
+        .to_string()
+}
+
 pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
+    let src = &convert_attributes(src);
     // 1) コメント・出力
     let s = Regex::new(r"(?s)\{\{--(.*?)--\}\}").unwrap().replace_all(src, "{#$1#}").to_string();
     let echo_raw = Regex::new(r"(?s)\{!!(.*?)!!\}").unwrap();
@@ -459,6 +505,8 @@ pub fn convert(src: &str, name: &str, warn: &mut Vec<String>) -> String {
             "parent" => out.push_str("{{ super() }}"),
             "props" => {
                 let inner = arg.trim().strip_prefix('[').and_then(|x| x.strip_suffix(']')).unwrap_or("");
+                let names: Vec<String> = split_top_commas(inner).iter().map(|it| format!("{:?}", unquote(it.split_once("=>").map(|x| x.0).unwrap_or(it)))).collect();
+                out.push_str(&format!("{{% set _props = [{}] %}}", names.join(", ")));
                 for it in split_top_commas(inner) {
                     if let Some((k, v)) = it.split_once("=>") {
                         match jexpr(v) {
@@ -592,10 +640,12 @@ mod tests {
     fn components() {
         let mut w = vec![];
         let o = convert("<x-alert type=\"error\" :n=\"$count\" label=\"{{ $l }}\">Hi <b>x</b></x-alert><x-forms.input name=\"a\" />", "t", &mut w);
-        assert!(o.contains("{% with type=\"error\", n=count, label=l %}{% set slot %}Hi <b>x</b>{% endset %}{% include \"components/alert.html\" %}{% endwith %}"), "{o}");
-        assert!(o.contains("{% with name=\"a\" %}{% include \"components/forms/input.html\" %}{% endwith %}"), "{o}");
+        assert!(o.contains("{% with type=\"error\", n=count, label=l, attributes={\"type\": \"error\", \"n\": count, \"label\": l} %}{% set slot %}Hi <b>x</b>{% endset %}{% include \"components/alert.html\" %}{% endwith %}"), "{o}");
+        assert!(o.contains("{% with name=\"a\", attributes={\"name\": \"a\"} %}{% include \"components/forms/input.html\" %}{% endwith %}"), "{o}");
         let p = convert("@props(['type' => 'info'])<p class=\"{{ $type }}\">{{ $slot }}</p>", "c", &mut w);
-        assert!(p.contains("{% set type = type|default('info') %}") && p.contains("{{ slot }}"), "{p}");
+        assert!(p.contains("{% set type = type|default('info') %}") && p.contains("{{ slot }}") && p.contains("{% set _props = [\"type\"] %}"), "{p}");
+        let a = convert("@props(['type'])<div {{ $attributes->merge(['class' => 'box', 'role' => 'x']) }}>{{ $attributes }}</div>", "c", &mut w);
+        assert!(a.contains("class=\"box{% if (attributes|default({})).get('class') %} {{ attributes.class }}{% endif %}\"") && a.contains("{% if 'role' in (attributes|default({})) %}") && a.contains("k not in (_props|default([]))") && !a.contains("TODO"), "{a}");
     }
 
     #[test]
