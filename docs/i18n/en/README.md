@@ -17,7 +17,7 @@ It works on Windows, Linux and Mac (version 0.1.0, still being built).
 |---|---|
 | `pl2pl php` | PHP (Laravel / Symfony) → FastAPI. More in [PHP.md](../../PHP.md) (Japanese) |
 | `pl2pl web` | Looks inside a folder, spots Java, COBOL, PHP and Flask/Django, and hands each one to the right tool |
-| `pl2pl ir` | (a test version) Puts the "routes" of PHP, Python and Java into one shape, then makes JSON, OpenAPI or a FastAPI starter |
+| `pl2pl ir` | (a test version) Puts the "routes" of PHP, Python and Java into one shape, then makes JSON, OpenAPI or a FastAPI starter. The PHP conversion also loads types, function bodies, models, middleware and templates into this shape before writing |
 | `pl2pl watch` | Finds new versions of languages and tools, and catches up by itself |
 | `pl2pl cobol` | COBOL + JCL → GnuCOBOL (Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | Makes C/C++ loops run faster (gpu is a test version) |

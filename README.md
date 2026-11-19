@@ -18,7 +18,7 @@ Windows・Linux・Mac で使えます(v0.1.0、まだ作っている途中です
 |---|---|
 | `pl2pl php` | PHP(Laravel / Symfony)→ FastAPI。くわしくは [docs/PHP.md](docs/PHP.md) |
 | `pl2pl web` | フォルダの中を見て、Java・COBOL・PHP・Flask/Django を見分けて、合う道具に任せる |
-| `pl2pl ir` | (試作)PHP・Python・Java の「道すじ(ルート)」を同じ形にして、JSON・OpenAPI・FastAPI のひな形にする |
+| `pl2pl ir` | (試作)PHP・Python・Java の「道すじ(ルート)」を同じ形にして、JSON・OpenAPI・FastAPI のひな形にする。PHP の変換も、型・関数の本体・モデル・ミドルウェア・画面をこの形にのせてから書き出す |
 | `pl2pl watch` | 言葉や道具の新しい版を見つけて、自動で追いつく |
 | `pl2pl cobol` | COBOL+JCL → GnuCOBOL(Linux) |
 | `pl2pl omp` / `kokkos` / `gpu` | C/C++ のくり返しを、はやく動く形にする(gpu は試作) |

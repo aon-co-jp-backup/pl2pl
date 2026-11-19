@@ -2,7 +2,7 @@
 - **やくわり**: 言葉(言語)・フレームワーク・OS をまたいで書きかえる道具(Rust 製、`src/`)。元になる言葉の一覧は `docs/LANGUAGES.md`、組み合わせは `docs/COMBINATIONS.md`。設計は持ち主が `docs/DESIGN.md` に少しずつ書く。**勝手に仕様を決めて書かない。**
 - **ほうこう**: 有名な言葉どうしの「多対多」の書きかえを目ざす。全部を一度には作らず、選んだものから。WEB は説明とダウンロードだけで、書きかえは PC のアプリで行う。
 - **きまり**: 書きかえられない所は `TODO` で残して報告する(こっそり消さない)。判定は慎重に(依存や副作用が心配なら変えない)。実際に動かしてから「できた」と言う。新しい REST は作らない。返事は日本語のみ。
-- **共通の形(IR)**: `src/ir.rs`。入力側(PHP・Python・Java)と出力側(JSON・OpenAPI・FastAPI)を分けて、組み合わせを増やしやすくする。ルートを見つけられなかったファイルは報告する。出力は `py_compile` などで実際に確かめる。
+- **共通の形(IR)**: `src/ir.rs`(型・本体・モデル・ミドルウェア・テンプレート)と、書き出し側の `src/ir_emit.rs`。入力側(PHP・Python・Java)と出力側(JSON・OpenAPI・FastAPI)を分けて、組み合わせを増やしやすくする。`pl2pl php` もこの共通の書き出しを通る(出力を変えない変更は、前後の出力の diff が空であることで確かめる)。ルートを見つけられなかったファイルは報告する。出力は `py_compile` などで実際に確かめる。
 - **PHP**: `src/php.rs`・`src/blade.rs`・`src/middleware.rs`。通し試験は `tests/run-php.sh`(本物の FastAPI・SQLite・Jinja2)、単体は `cargo test --release`。WSL では `wsl -d Ubuntu -- bash <ファイル>`。
 - **自動追従**: `pl2pl watch`(`src/watch.rs`、`registry/ecosystem.toml`)。確認コマンドが空の項目は「未検証」と出すだけで、勝手に更新しない。通知は version-control の `--notify-file`。
 - **配備**: 紹介ページは `webpage/index.html`。VPS は `/root/easy-web.tokyo/pl2pl`(`git pull` で更新、静的なので再起動は不要)、`pl2pl-web.service` ポート 8142、`domains.toml` に追記済み。
