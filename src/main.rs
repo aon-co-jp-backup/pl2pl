@@ -12,6 +12,7 @@ mod blade;
 mod middleware;
 mod php;
 mod watch;
+mod stack;
 mod web;
 mod util;
 
@@ -24,6 +25,8 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl omp    <dir|file> --out <dir>        C/C++ の独立ループへ OpenMP 指示行を付ける
   pl2pl kokkos <dir|file> --out <dir>        C++ の独立ループを Kokkos へ
   pl2pl pyhpc  <dir|file> --out <dir> [--mpi]  Python の数値関数へ Numba、--mpi で mpi4py の雛形
+  pl2pl web    <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] --out <dir>
+                                              COBOL(など)を、選んだ組み合わせのアプリの骨組みごと変換(最優先機能)
   pl2pl web    <dir> --target <fastapi|mfastapi|rust-poem|rpoem> --out <dir> [--dry-run]
                                               Java/COBOL/Flask/Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け
   pl2pl php    <dir> --out <dir> [--target fastapi|mfastapi] [--explain]   PHP(Laravel/Symfony)のルートを FastAPI の骨組みへ
@@ -109,8 +112,19 @@ fn main() {
         return;
     }
     if cmd == "web" {
+        let dry = a.iter().any(|x| x == "--dry-run");
+        // 組み合わせ選択: --backend / --frontend / --db のどれかがあれば、--target より優先して骨組みを足す
+        if let Some(b) = arg(&a, "--backend") {
+            match stack::Stack::new(&b, arg(&a, "--frontend").as_deref(), arg(&a, "--db").as_deref()) {
+                Ok(st) => std::process::exit(web::run_stack(&input, &out, &st, dry)),
+                Err(e) => {
+                    eprintln!("pl2pl web: {e}");
+                    std::process::exit(2);
+                }
+            }
+        }
         let t = arg(&a, "--target").unwrap_or_else(|| "fastapi".into());
-        std::process::exit(web::run(&input, &out, &t, a.iter().any(|x| x == "--dry-run")));
+        std::process::exit(web::run(&input, &out, &t, dry));
     }
     if cmd == "ir" {
         // 共通の中間表現(試作): 入力のルートを IR にして、json か openapi で書き出す

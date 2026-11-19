@@ -163,3 +163,31 @@ Route::get('/', fn() => 1);
         std::fs::remove_dir_all(&d).ok();
     }
 }
+
+/// 組み合わせ(backend x frontend x db)を選んだ変換。COBOL の出力フォルダ(`<out>/cobol`)へ骨組みを足す。
+pub fn run_stack(dir: &Path, out: &Path, st: &crate::stack::Stack, dry: bool) -> i32 {
+    println!("組み合わせ / stack: backend={} frontend={} db={}", st.backend, st.frontend, st.db);
+    let legacy = crate::stack::legacy_programs(dir);
+    let (j, c, py, ph) = detect(dir);
+    let mut code = 0;
+    if j + c + py.len() + ph > 0 || legacy.is_empty() {
+        code = run(dir, out, st.converter_target(), dry);
+    }
+    if dry || code != 0 {
+        if dry && !legacy.is_empty() {
+            println!("[C/C++/Fortran {} 本] 橋渡し(そのままビルドして {} から呼ぶ)", legacy.len(), st.backend);
+        }
+        return code;
+    }
+    let cobol_out = out.join("cobol");
+    if cobol_out.is_dir() {
+        let n = crate::stack::scaffold(&cobol_out, st);
+        println!("COBOL: 骨組みを {n} ファイル書きました → {}", cobol_out.display());
+    }
+    if !legacy.is_empty() {
+        let lo = out.join("legacy");
+        let n = crate::stack::scaffold_legacy(&lo, dir, &legacy, st);
+        println!("C/C++/Fortran {} 本: 橋渡しを {n} ファイル書きました → {}(build.sh で元のソースをビルド)", legacy.len(), lo.display());
+    }
+    code
+}
