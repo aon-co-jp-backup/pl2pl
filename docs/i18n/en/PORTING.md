@@ -19,7 +19,7 @@
 4. Set up the nightly and morning runs on a PC (not done: the check command does not work on this PC and would give false alarms; see the top of `scripts/pl2pl-watch.cmd` for an example).
 5. (Done) A pl2pl card is on the easy-web.tokyo top page and live in production (open-easy-web `95cb1e7`; the old binary is `server/target/release/open-easy-web-server.before-pl2pl-card-20261119`).
 6. PHP (partly done): Blade `@php` that only assigns variables (also `@php($x = 1)`) now becomes `{% set %}` (50 end-to-end checks pass). Still open: Blade parts written as classes, `$attributes`, `morphToMany`; an `@php` with anything but assignments stays a TODO as before.
-7. aruaru-llm link-up (a real `llm setup` install is unchecked). Kokkos on the GPU; kernels on open-cuda / open-directx.
+7. aruaru-llm link-up: on 2026-11-19 `pl2pl llm setup --dry-run` was re-checked (13.7 GB free -> qwen2.5-1.5b-instruct, about 2.9 GB). **A real install has not been done**: it is a download of about 2.9 GB, and this PC has no aruaru-llm executable to bundle (`components/bin/` is empty). To do it, first run `bash installer/bundle-components.sh`, and confirm the download is acceptable. Kokkos on the GPU and running kernels on open-cuda / open-directx are also unchecked.
 8. Delete the original COBOL_to and Java_to (**this cannot be undone, so ask for a final OK first**).
 9. The owner writes `docs/DESIGN.md`. We re-read `docs/LANGUAGES.md` on 2026-11-19 and found nothing out of line with the current state (Java and COBOL have converters). It is still a knowledge-based list, not checked against a fresh web search.
 

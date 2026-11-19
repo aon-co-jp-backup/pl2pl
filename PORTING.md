@@ -17,7 +17,7 @@
 4. 毎晩・毎朝の自動実行の登録(この PC では確認コマンドが動かず誤報になるので未登録。登録の例は `scripts/pl2pl-watch.cmd` の先頭)。
 5. (済み)easy-web.tokyo のトップページに pl2pl の紹介カードを足し、本番(VPS の open-easy-web)へ反映しました。open-easy-web `95cb1e7`、旧バイナリは `server/target/release/open-easy-web-server.before-pl2pl-card-20261119`。
 6. PHP(一部済み): Blade の `@php`(代入だけの文・`@php($x = 1)`)は `{% set %}` に変換するようにした(通し試験 50 件)。残り: クラスで作る Blade の部品・`$attributes`・`morphToMany`、代入以外の `@php` はこれまでどおり TODO。
-7. aruaru-llm との連携(`llm setup` の実導入は未確認)。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行。
+7. aruaru-llm との連携: 2026-11-19 に `pl2pl llm setup --dry-run` を再確認(空き 13.7GB → qwen2.5-1.5b-instruct、約 2.9GB)。**実際の導入は未実施**: 約 2.9GB のダウンロードになり、この PC には同梱用の aruaru-llm 実行ファイルも無い(`components/bin/` は空)。やるなら先に `bash installer/bundle-components.sh` で取り込み、ダウンロードしてよいか確認してから。Kokkos の GPU 実行、open-cuda / open-directx でのカーネル実行も未確認。
 8. 元の COBOL_to・Java_to の削除(**取り返しがつかないので、最後の確認を取ってから**)。
 9. `docs/DESIGN.md` は持ち主が書く。`docs/LANGUAGES.md` は 2026-11-19 に中身を見直し、いまの状態(Java・COBOL は変換器あり)と食い違いはなかった(ただし知識ベースの一覧で、検索による最新性の確認はまだ)。
 
