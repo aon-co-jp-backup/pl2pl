@@ -26,7 +26,7 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl pyhpc  <dir|file> --out <dir> [--mpi]  Python の数値関数へ Numba、--mpi で mpi4py の雛形
   pl2pl web    <dir> --target <fastapi|mfastapi|rust-poem|rpoem> --out <dir> [--dry-run]
                                               Java/COBOL/Flask/Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け
-  pl2pl php    <dir> --out <dir> [--target fastapi|mfastapi]   PHP(Laravel/Symfony)のルートを FastAPI の骨組みへ
+  pl2pl php    <dir> --out <dir> [--target fastapi|mfastapi] [--explain]   PHP(Laravel/Symfony)のルートを FastAPI の骨組みへ
   pl2pl gpu    <dir|file> --out <dir> --target <open-cuda|open-directx>   (試作)独立ループから GPU カーネル(.cu / .hlsl)
   pl2pl doctor                                   open-cpu(同梱)で検出した CPU 情報と、同梱コンポーネントの一覧
   pl2pl llm setup [--url http://127.0.0.1:4600] [--model <id>] [--dry-run]
@@ -139,6 +139,13 @@ fn main() {
         let files: Vec<(String, String)> = util::files(&input, &["php"]).into_iter().map(|(p, rel)| (rel.to_string_lossy().replace('\\', "/"), util::read(&p))).collect();
         for (n, c) in php::generate(&files, &t, &mut rep) {
             let _ = util::write(&out, Path::new(&n), &c);
+        }
+        if a.iter().any(|x| x == "--explain") {
+            let url = arg(&a, "--url").unwrap_or_else(|| "http://127.0.0.1:4600".into());
+            match llm::ensure_running(&url) {
+                Ok(()) => rep = llm::explain_todos(&url, &rep, arg(&a, "--explain-max").and_then(|x| x.parse().ok()).unwrap_or(3)),
+                Err(e) => eprintln!("--explain: {e}(説明なしで続けます)"),
+            }
         }
         let _ = util::write_report(&out, "php", &rep);
         println!("pl2pl php: {} ファイル処理、レポート {} 項目 → {}", files.len(), rep.len(), out.display());

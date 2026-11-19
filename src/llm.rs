@@ -99,6 +99,11 @@ mod tests {
         let _ = find_binary();
     }
     #[test]
+    fn reads_text_field() {
+        assert_eq!(json_text(r#"{"text":" a\n\"b\" あ","engine":"x"}"#).as_deref(), Some(" a\n\"b\" あ"));
+        assert!(json_text("{}").is_none());
+    }
+    #[test]
     fn choice_validation() {
         assert!(set_choice("bogus").is_err());
     }
@@ -163,6 +168,68 @@ pub fn ensure_running(url: &str) -> Result<(), String> {
         }
     }
     Err("起動後 60 秒待っても応答しません".into())
+}
+
+/// 応答 JSON の `"text"` の文字列だけを取り出す(依存を増やさない最小の読み取り。エスケープ `\n` `\"` `\\` `\uXXXX` に対応)。
+pub fn json_text(body: &str) -> Option<String> {
+    let k = body.find("\"text\"")?;
+    let rest = &body[k + 6..];
+    let rest = rest.trim_start().strip_prefix(':')?.trim_start().strip_prefix('"')?;
+    let (mut out, mut it) = (String::new(), rest.chars());
+    while let Some(c) = it.next() {
+        match c {
+            '"' => return Some(out),
+            '\\' => match it.next()? {
+                'n' => out.push('\n'),
+                't' => out.push('\t'),
+                'u' => {
+                    let h: String = it.by_ref().take(4).collect();
+                    out.push(char::from_u32(u32::from_str_radix(&h, 16).ok()?).unwrap_or('?'));
+                }
+                o => out.push(o),
+            },
+            c => out.push(c),
+        }
+    }
+    None
+}
+
+/// レポートの「未変換(TODO)」の項目ごとに、aruaru-llm(Qwen)へ「なぜ自動で変換できないか・手で直す手順」を尋ね、参考として項目の下に足す。
+/// 小さいモデルの答えは間違うことがあるので、**参考(AI)** と明記する。上限 `max` 件(CPU では 1 件に数十秒かかる)。
+pub fn explain_todos(url: &str, rep: &[String], max: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::with_capacity(rep.len());
+    // 起動し直した aruaru-llm は使うモデルが未選択(GenerateQwen が 400)。導入済みの最も大きいモデルを選び直す
+    let selected = CANDIDATES.iter().any(|c| post(url, "QwenSelect", &format!("{{\"id\":\"{}\"}}", c.0)).is_ok());
+    if !selected {
+        eprintln!("導入済みのモデルが見つかりません。先に `pl2pl llm setup` を実行してください(説明なしで続けます)");
+        return rep.to_vec();
+    }
+    let mut n = 0;
+    let mut failed = false;
+    for l in rep {
+        out.push(l.clone());
+        if failed || n >= max || !(l.contains("TODO") || l.contains("未変換") || l.contains("未対応")) {
+            continue;
+        }
+        let prompt = format!("次は、PHP から FastAPI(Python)への自動変換レポートの1項目です。なぜ自動で変換できなかったかと、手で直すときの手順を、日本語で2文で、短く説明してください。\n項目: {}\n説明:", l.chars().take(200).collect::<String>());
+        let body = format!("{{\"prompt\":{:?},\"max_new_tokens\":60}}", prompt);
+        n += 1;
+        match post(url, "GenerateQwen", &body) {
+            Ok(r) => {
+                if let Some(t) = json_text(&r) {
+                    let t = t.trim().replace('\n', " ");
+                    if !t.is_empty() {
+                        out.push(format!("  ↳ 参考(AI の説明。間違うことがあります): {t}"));
+                    }
+                }
+            }
+            Err(e) => {
+                out.push(format!("  ↳ AI の説明は取得できませんでした: {e}"));
+                failed = true; // 以降は聞かない(レポートの項目は落とさない)
+            }
+        }
+    }
+    out
 }
 
 // ---- 利用者の選択(自動導入を外す / モデルを固定する)----
