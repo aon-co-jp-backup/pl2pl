@@ -1,53 +1,57 @@
 # pl2pl
 
 **Languages**: 日本語(このファイル) / [English](docs/i18n/en/README.md) / [简体中文](docs/i18n/zh-CN/README.md) / [繁體中文](docs/i18n/zh-TW/README.md) / [한국어](docs/i18n/ko/README.md) / [Deutsch](docs/i18n/de/README.md) / [Français](docs/i18n/fr/README.md) / [Español](docs/i18n/es/README.md) / [Русский](docs/i18n/ru/README.md) / [Português](docs/i18n/pt/README.md)
-(AI翻訳です。ネイティブの確認はまだです。CLAUDE.md と PORTING.md も同じフォルダにあります)
+(日本語と英語は、やさしい言葉に書き直しました。ほかの言葉は AI 翻訳で、少し古い内容が残っています。ネイティブの確認はまだです)
 
-**pl2pl は、プログラミング言語やフレームワークを、別のものへ変えるツールです。**
-たとえば、PHP(Laravel)で作ったサイトを、Python(FastAPI)に変えられます。Windows・Linux・Mac で使えます(v0.1.0、開発中)。
+## pl2pl ってなに?
+プログラムは、いろいろな「言葉」(プログラミング言語)で書かれています。
+**pl2pl は、ある言葉で書かれたプログラムを、別の言葉に書きかえる道具です。**
+たとえば、PHP(Laravel)で作ったサイトを、Python(FastAPI)のサイトに変えられます。
+Windows・Linux・Mac で使えます(v0.1.0、まだ作っている途中です)。
 
-- 変換は、パソコンに入れるアプリ(コマンド)で行います。WEBサイトは、説明書とダウンロードだけです。
-- 変換できない所は、黙って消さずに `TODO` として残し、理由を報告書に書きます。
-- 目標は、有名な言語やフレームワークどうしを、できるだけ多くの組み合わせで変えられるようにすることです。
+- 使うときは、パソコンに入れます。WEBサイトには、説明とダウンロードだけがあります → <https://easy-web.tokyo/pl2pl/>
+- 書きかえられない所は、こっそり消しません。`TODO`(あとでやること)として残して、理由を報告書に書きます。
+- ゴールは、有名な言葉どうしを、できるだけたくさんの組み合わせで書きかえられるようにすることです。
 
-## 今できること
-| コマンド | 内容 |
+## いまできること
+| コマンド | 何をするか |
 |---|---|
 | `pl2pl php` | PHP(Laravel / Symfony)→ FastAPI。くわしくは [docs/PHP.md](docs/PHP.md) |
-| `pl2pl web` | フォルダを調べて、Java・COBOL・PHP・Flask/Django を自動で見分け、合う変換器に回す |
-| `pl2pl ir` | (試作)PHP・Python・Java のルートを共通の形にして、JSON・OpenAPI・FastAPI の骨組みへ |
+| `pl2pl web` | フォルダの中を見て、Java・COBOL・PHP・Flask/Django を見分けて、合う道具に任せる |
+| `pl2pl ir` | (試作)PHP・Python・Java の「道すじ(ルート)」を同じ形にして、JSON・OpenAPI・FastAPI のひな形にする |
+| `pl2pl watch` | 言葉や道具の新しい版を見つけて、自動で追いつく |
 | `pl2pl cobol` | COBOL+JCL → GnuCOBOL(Linux) |
-| `pl2pl omp` / `kokkos` / `gpu` | C/C++ の繰り返し処理を、OpenMP・Kokkos・GPU用に変える(gpu は試作) |
-| `pl2pl cport` | UNIX 用の C を、WindowsでもLinuxでも動く形へ |
-| `pl2pl pyhpc` | Python の計算を Numba で速くする |
-| `pl2pl watch` | 言語やフレームワークの新しい版を見つけて、自動で追いつく(下を見てください) |
-| `pl2pl llm setup` | AI補助(aruaru-llm)を、パソコンに合わせて入れる(実際の導入は未確認) |
+| `pl2pl omp` / `kokkos` / `gpu` | C/C++ のくり返しを、はやく動く形にする(gpu は試作) |
+| `pl2pl cport` | UNIX 用の C を、Windows でも Linux でも動く形にする |
+| `pl2pl pyhpc` | Python の計算を Numba ではやくする |
+| `pl2pl llm setup` | AI の助っ人(aruaru-llm)を入れる(実際に入れる所は、まだ確かめていません) |
 
-## 新しい版へ、自動で追いつく
-`pl2pl watch` を毎晩・毎朝に動かします。
-1. 言語やフレームワークの新しい版を、調べます(`registry/ecosystem.toml` の一覧)。
-2. 新しい版でテストして、通れば「対応済みの版」を自動で更新します。
-3. 通らなければ、version-control(AIの助けつき)が直そうとします。
-4. それでも直らなければ、登録してあるメールとLINEに知らせます。
+## 新しい版に、自動で追いつく
+`pl2pl watch` を、毎晩と毎朝に動かします。
+1. 言葉や道具の新しい版が出ていないか、調べます(一覧は `registry/ecosystem.toml`)。
+2. 新しい版でテストします。通れば、「対応している版」を自動で新しくします。
+3. 通らなければ、version-control(AI の助けつき)が直そうとします。
+4. それでも直らなければ、登録してあるメールと LINE に知らせます。
 
-毎晩・毎朝の動かし方は `scripts/pl2pl-watch.cmd`(Windows)と `scripts/pl2pl-watch.sh`(Linux/Mac)にあります。
-注意: laravel・symfony・flask・django などは、まだ「新しい版が出たよ」と知らせるだけです(本物の新しい版でのテストは、これから作ります)。
+注意: laravel・symfony・flask・django などは、いまは「新しい版が出たよ」と知らせるだけです。
+GitHub では、毎晩と毎朝に、新しい版でテストが自動で動いています。
 
-## 使い方の例
+## 使い方
 ```
 pl2pl php ./myapp --out ./out
 pl2pl web ./project --target fastapi --out ./out
+pl2pl ir ./project --out ./out --format openapi
 ```
 
-## 注意
-- 変換は慎重です。危なそうな所は、変えずに理由を報告します。速さは保証しません。
+## 気をつけること
+- pl2pl は慎重です。あぶなそうな所は、変えずに理由を知らせます。はやさは約束できません。
 - テストは、小さなサンプルだけです。大きな本物のプログラムでは、まだ試していません。
 
 ## これから
-- PHP: クラスで作る Blade 部品。
-- 共通の中間表現(IR)を作り、言語×言語の組み合わせを一気に増やす。
-- 実際のメール通知・AIによる自動修正の確認。
-- GPU での実行確認(open-cuda / open-directx)。
+- 型や中身(関数の本体)も共通の形にのせて、FastAPI への変換をそこを通すようにする。
+- PHP: クラスで作る Blade の部品。
+- 本物のメール通知と、AI による自動修正の確認。
+- GPU で動かす確認(open-cuda / open-directx)。
 
 ## もっと知る
-[docs/LANGUAGES.md](docs/LANGUAGES.md)(言語の一覧) / [docs/COMBINATIONS.md](docs/COMBINATIONS.md)(組み合わせ) / [docs/DESIGN.md](docs/DESIGN.md)(設計。所有者が書いています) / [components/README.md](components/README.md)(同梱の部品)
+[docs/LANGUAGES.md](docs/LANGUAGES.md)(言葉の一覧) / [docs/COMBINATIONS.md](docs/COMBINATIONS.md)(組み合わせ) / [docs/DESIGN.md](docs/DESIGN.md)(設計。持ち主が書いています) / [components/README.md](components/README.md)(いっしょに入る部品)
