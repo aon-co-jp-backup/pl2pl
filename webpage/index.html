@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pl2pl — ダウンロード / Download</title>
+<meta name="description" content="pl2pl: プログラミング言語やフレームワークを、別のものへ変えるツール。Windows・Linux・Mac 用。">
+<style>
+:root{--bg:#fff;--fg:#14181f;--sub:#57606a;--card:#f6f8fa;--line:#d0d7de;--acc:#1f6feb}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--sub:#8b949e;--card:#161b22;--line:#30363d;--acc:#4a9eff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{margin:0 0 4px;font-size:1.8rem}
+h2{margin:32px 0 8px;font-size:1.2rem}
+.sub{color:var(--sub)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+a{color:var(--acc)}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+code{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.btn{display:inline-block;margin:4px 6px 4px 0;padding:8px 14px;border-radius:8px;background:var(--acc);color:#fff;text-decoration:none}
+</style>
+</head>
+<body>
+<main>
+<h1>pl2pl</h1>
+<p class="sub">プログラミング言語やフレームワークを、別のものへ変えるツール / Converts code between programming languages and frameworks</p>
+
+<h2>ダウンロード / Download</h2>
+<div class="card">
+<p>パソコンに入れて使います。このWEBサイトで変換はしません。 / Install it on your computer. This website does not convert anything.</p>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl-Setup-x64.exe">Windows (x64)</a>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl-Setup-arm64.exe">Windows (ARM64)</a>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl-0.1.0-macos-arm64.pkg">Mac (Apple Silicon)</a>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl-0.1.0-macos-x64.pkg">Mac (Intel)</a>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl_0.1.0_amd64.deb">Linux .deb (amd64)</a>
+<a class="btn" href="https://github.com/aon-co-jp/pl2pl/releases/latest/download/pl2pl_0.1.0_arm64.deb">Linux .deb (arm64)</a>
+<p class="sub">その他(tar.gz・SHA256SUMS)/ Others: <a href="https://github.com/aon-co-jp/pl2pl/releases/latest">GitHub Releases</a>。ダウンロード後は SHA256SUMS.txt と照合してください。 / Please check the download against SHA256SUMS.txt.</p>
+</div>
+
+<h2>できること / What it does</h2>
+<table>
+<tr><th>コマンド</th><th>内容 / What</th></tr>
+<tr><td><code>pl2pl php</code></td><td>PHP (Laravel / Symfony) → FastAPI</td></tr>
+<tr><td><code>pl2pl web</code></td><td>Java・COBOL・PHP・Flask/Django を自動で見分けて変換 / auto-detects and converts</td></tr>
+<tr><td><code>pl2pl ir</code></td><td>(試作 / prototype) PHP・Python・Java のルート → JSON / OpenAPI</td></tr>
+<tr><td><code>pl2pl watch</code></td><td>言語・フレームワークの新しい版へ自動で追いつく / keeps up with new versions</td></tr>
+<tr><td><code>pl2pl cobol</code> / <code>omp</code> / <code>kokkos</code> / <code>cport</code> / <code>pyhpc</code></td><td>COBOL・C/C++・Python の移植と高速化 / porting and speed-ups</td></tr>
+</table>
+<p>変換できない所は、黙って消さずに <code>TODO</code> として残し、理由を報告書に書きます。 / Anything that cannot be converted is left as a <code>TODO</code> with a reason in the report.</p>
+
+<h2>説明書 / Manuals</h2>
+<div class="card">
+<a href="https://github.com/aon-co-jp/pl2pl#readme">日本語</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/en/README.md">English</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/zh-CN/README.md">简体中文</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/zh-TW/README.md">繁體中文</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/ko/README.md">한국어</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/de/README.md">Deutsch</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/fr/README.md">Français</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/es/README.md">Español</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/ru/README.md">Русский</a> ·
+<a href="https://github.com/aon-co-jp/pl2pl/blob/main/docs/i18n/pt/README.md">Português</a>
+<p class="sub">翻訳はAIによるもので、ネイティブの確認はまだです。 / Translations are by AI and not yet checked by native speakers.</p>
+</div>
+
+<p class="sub">ソース: <a href="https://github.com/aon-co-jp/pl2pl">github.com/aon-co-jp/pl2pl</a>(MIT)</p>
+</main>
+</body>
+</html>
