@@ -82,6 +82,16 @@ fn run_sh(cmd: &str, dir: &Path) -> bool {
     }
     let mut it = cmd.split_whitespace();
     let prog = it.next().unwrap();
+    // Windows では bash = WSL(Git Bash には venv や python が揃っていないので誤警報になる)。パスは /mnt/<ドライブ>/ 形式にする
+    if cfg!(windows) && prog == "bash" {
+        let d = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()).to_string_lossy().replace(r"\?\", "").replace(char::from(92), "/");
+        let wd = match d.split_once(':') {
+            Some((drv, rest)) => format!("/mnt/{}{}", drv.to_lowercase(), rest),
+            None => d,
+        };
+        let script = format!("cd '{wd}' && bash {}", it.collect::<Vec<_>>().join(" "));
+        return Command::new("wsl").args(["-d", "Ubuntu", "--", "bash", "-lc", &script]).env("MSYS_NO_PATHCONV", "1").status().map(|s| s.success()).unwrap_or(false);
+    }
     Command::new(prog).args(it).current_dir(dir).status().map(|s| s.success()).unwrap_or(false)
 }
 

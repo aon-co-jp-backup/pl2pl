@@ -6,21 +6,21 @@ name = fastapi
 source = pypi
 package = fastapi
 tested = 0.165
-verify = bash tests/run-php.sh
+verify = bash tests/verify-py.sh fastapi
 
 [[eco]]
 name = sqlalchemy
 source = pypi
 package = sqlalchemy
 tested = 2.1
-verify = bash tests/run-php.sh
+verify = bash tests/verify-py.sh sqlalchemy
 
 [[eco]]
 name = jinja2
 source = pypi
 package = jinja2
 tested = 3.1
-verify = bash tests/run-php.sh
+verify = bash tests/verify-py.sh jinja2
 
 [[eco]]
 name = laravel

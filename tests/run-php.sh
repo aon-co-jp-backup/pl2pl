@@ -1,7 +1,7 @@
 #!/bin/bash
 # PHP → FastAPI の通し試験(fastapi/httpx が入った venv が必要)
 set -e
-[ -f "$HOME/2fa-venv/bin/activate" ] && . "$HOME/2fa-venv/bin/activate"
+if [ -n "$PL_VENV" ]; then . "$PL_VENV/bin/activate"; elif [ -f "$HOME/2fa-venv/bin/activate" ]; then . "$HOME/2fa-venv/bin/activate"; fi
 B=${B:-/tmp/pl_t/release/pl2pl}
 rm -rf /tmp/o4; "$B" php "$(dirname "$0")/samples/php" --out /tmp/o4
 cd /tmp/o4 && rm -f app.db && python - <<'PYEOF'
