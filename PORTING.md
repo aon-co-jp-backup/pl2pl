@@ -53,3 +53,5 @@
 5. Bring the 8 other language docs up to date
 **What we still ask a person**: deleting the original COBOL_to / Java_to cannot be undone, so we always ask you first.
 **Rule**: "Unfinished work goes on automatically, without asking." This is the standing rule.
+
+- 2026-11-19 追記 / Update: 夜 03:00・朝 07:00 の自動実行を登録し、手動実行で exit=0(誤警報なし)を確認。/ Nightly (03:00) and morning (07:00) runs are registered; a manual run ended with exit=0 and no false alarm. 次: メール到達・GPU(Kokkos等)・PHP残り。Next: mail arrival, GPU (Kokkos etc.), PHP leftovers.
