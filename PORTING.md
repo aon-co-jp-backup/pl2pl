@@ -13,7 +13,7 @@
 ## まだのこと(優先順)
 1. **確認**: 実際のメールの着信(`version-control --test-notify`。この PC に SMTP の設定が無い)、version-control の `--loop` による自動修正、fastapi 最新版でのテスト(GitHub の毎晩の実行が確かめる)。
 2. (済み・ただし薄い)IR に型つき引数・依存・本体(`Body`)・モデル(`Model`/`Relation`)・ミドルウェア・テンプレート(`Template`)をのせ、`pl2pl php` の出力は `ir_emit.rs` の共通出力を通す(出力は変更前と同一、単体40件・e2e 49件成功)。ただしテンプレートは変換済みの Jinja2 文字列を持つだけで、Blade のノード木ではない(ほかの言語・出力先へ回すなら木にする必要あり)。ルート抽出が取りこぼすなら tree-sitter を検討。
-3. `watch` を「本物の新しい版」で試す(laravel・symfony・spring-boot・flask・django・poem は未検証あつかい)。
+3. `watch` を本物の新しい版で試した: fastapi 0.165.0(starlette 1.10)で `tests/run-php.sh` が 49 件成功したので、registry の tested を 0.165 へ進めた。残り: laravel 13 / django 6.1 / spring-boot 4.1 の新版は、通し試験が実物のフレームワークを使わないため「未検証」のまま(実物を使う試験を作るまで報告のみ)。
 4. 毎晩・毎朝の自動実行の登録(この PC では確認コマンドが動かず誤報になるので未登録。登録の例は `scripts/pl2pl-watch.cmd` の先頭)。
 5. easy-web.tokyo のトップページに、pl2pl の紹介カードを足す。
 6. PHP: クラスで作る Blade の部品・`$attributes`・`@php`・`morphToMany`。
