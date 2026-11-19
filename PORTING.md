@@ -75,3 +75,7 @@ PHP 変換は、ルート・複数文の本体・Eloquent(SQLAlchemy)・クエ�
 **2026-11-19 追記22**: `pl2pl web` が、実行ファイルの隣か `components/bin/` にある変換器を先に使い、無ければ PATH の名前を呼ぶようにした(`resolve_in`、単体テストあり)。配布物を作る前に `bash installer/build-converters.sh` で `converters/` の2つをビルドして `components/bin/` へ置く(bundle-components.sh と同じ置き場所)。未了: リリースのワークフローがこのスクリプトを呼んで配布物へ入れること、元リポジトリの削除(最終確認待ち)。
 
 **2026-11-19 追記23**: リリースのワークフロー(`release.yml`)が `installer/build-converters.sh [三つ組]` で cobol_to・java_to をビルドし、Windows exe(Inno、`{app}` へ)・Linux deb(`/usr/lib/pl2pl/`)と tar.gz・macOS pkg(`/usr/local/lib/pl2pl/`)へ同梱するようにした。`pl2pl web` は実行ファイルの隣・`components/bin/`・`../lib/pl2pl` の順に探す。スモークテストで、同梱の java_to で `pl2pl web` が変換できること(PATH には無い状態、Linux/macOS)・Windows は2つの exe が入っていることを確認。workflow_dispatch の手動実行で全7ジョブ成功(run 44456793567。タグは打っていない=公開はしていない)。通し試験の Python 依存に sqlalchemy・jinja2 を足した。未了: 元リポジトリの削除(最終確認待ち)、次のタグ公開(v0.1.1 など)。
+
+## 追記24(2026-11-19)
+- `pl2pl web` が PHP(Laravel/Symfony)を自動検出し、自身の `php` 変換へ振り分けるようにした(`--target fastapi` のみ)。単体テスト追加済み。
+- 方針(ユーザー指示): 有名な言語・フレームワークの任意の組み合わせ間の変換を想定する。次の設計課題は、検出器(入力側)と生成器(出力側)を登録式に分離し、共通中間表現(IR)経由で N×M を N+M に減らすこと。

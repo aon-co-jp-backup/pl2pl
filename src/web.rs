@@ -10,15 +10,21 @@ pub struct Job {
     pub note: String,
 }
 
-pub fn detect(dir: &Path) -> (usize, usize, Vec<&'static str>) {
-    // (Java 件数, COBOL 件数, Python のフレームワーク)
-    let (mut j, mut c) = (0, 0);
+/// 検出結果: (Java 件数, COBOL 件数, Python のフレームワーク, PHP フレームワーク(Laravel/Symfony)の件数)
+pub fn detect(dir: &Path) -> (usize, usize, Vec<&'static str>, usize) {
+    let (mut j, mut c, mut ph) = (0, 0, 0);
     let mut py: Vec<&'static str> = vec![];
-    for (p, _) in crate::util::files(dir, &["java", "cbl", "cob", "cobol", "py"]) {
+    for (p, _) in crate::util::files(dir, &["java", "cbl", "cob", "cobol", "py", "php"]) {
         let ext = p.extension().map(|x| x.to_string_lossy().to_lowercase()).unwrap_or_default();
         match ext.as_str() {
             "java" => j += 1,
             "cbl" | "cob" | "cobol" => c += 1,
+            "php" => {
+                let t = crate::util::read(&p);
+                if t.contains("Illuminate\\") || t.contains("Route::") || t.contains("Symfony\\") || t.contains("#[Route") {
+                    ph += 1;
+                }
+            }
             _ => {
                 let t = crate::util::read(&p);
                 for (key, name) in [("flask", "flask"), ("django", "django"), ("fastapi", "fastapi")] {
@@ -33,11 +39,11 @@ pub fn detect(dir: &Path) -> (usize, usize, Vec<&'static str>) {
             }
         }
     }
-    (j, c, py)
+    (j, c, py, ph)
 }
 
 pub fn plan(dir: &Path, out: &Path, target: &str) -> Vec<Job> {
-    let (j, c, py) = detect(dir);
+    let (j, c, py, ph) = detect(dir);
     let d = dir.to_string_lossy().to_string();
     let o = |sub: &str| out.join(sub).to_string_lossy().to_string();
     let mut v = vec![];
@@ -46,6 +52,12 @@ pub fn plan(dir: &Path, out: &Path, target: &str) -> Vec<Job> {
     }
     if c > 0 {
         v.push(Job { label: format!("COBOL {c} ファイル"), program: "cobol_to".into(), args: vec!["--src".into(), d.clone(), "--target".into(), target.into(), "--out".into(), o("cobol")], note: "https://github.com/aon-co-jp/COBOL_to".into() });
+    }
+    if ph > 0 && target == "fastapi" {
+        // PHP は pl2pl 自身の `php` 変換を使う(program "pl2pl" は実行中の自分自身)
+        v.push(Job { label: format!("PHP(Laravel/Symfony) {ph} ファイル"), program: "pl2pl".into(), args: vec!["php".into(), d.clone(), "--out".into(), o("php")], note: "pl2pl 自身".into() });
+    } else if ph > 0 {
+        eprintln!("pl2pl web: PHP は現在 --target fastapi のみ対応です(スキップ)");
     }
     let poem = target == "rust-poem" || target == "rpoem";
     for fw in py {
@@ -83,7 +95,7 @@ fn resolve_program(name: &str) -> std::path::PathBuf {
 pub fn run(dir: &Path, out: &Path, target: &str, dry: bool) -> i32 {
     let jobs = plan(dir, out, target);
     if jobs.is_empty() {
-        println!("pl2pl web: 変換できるもの(Java / COBOL / Flask・Django)が見つかりませんでした: {}", dir.display());
+        println!("pl2pl web: 変換できるもの(Java / COBOL / PHP / Flask・Django)が見つかりませんでした: {}", dir.display());
         return 1;
     }
     let mut fail = 0;
@@ -92,7 +104,8 @@ pub fn run(dir: &Path, out: &Path, target: &str, dry: bool) -> i32 {
         if dry {
             continue;
         }
-        match Command::new(resolve_program(&j.program)).args(&j.args).status() {
+        let exe = if j.program == "pl2pl" { std::env::current_exe().unwrap_or_else(|_| "pl2pl".into()) } else { resolve_program(&j.program) };
+        match Command::new(exe).args(&j.args).status() {
             Ok(s) if s.success() => {}
             Ok(s) => {
                 eprintln!("  失敗(終了コード {:?})", s.code());
@@ -139,9 +152,12 @@ mod tests {
         std::fs::write(d.join("A.java"), "class A {}").unwrap();
         std::fs::write(d.join("p.cbl"), "PROGRAM-ID. P.").unwrap();
         std::fs::write(d.join("app.py"), "from flask import Flask\n").unwrap();
+        std::fs::write(d.join("routes.php"), "<?php
+Route::get('/', fn() => 1);
+").unwrap();
         let jobs = plan(&d, Path::new("out"), "fastapi");
         let progs: Vec<&str> = jobs.iter().map(|j| j.program.as_str()).collect();
-        assert_eq!(progs, vec!["java_to", "cobol_to", "2fastapi"]);
+        assert_eq!(progs, vec!["java_to", "cobol_to", "pl2pl", "2fastapi"]);
         let poem = plan(&d, Path::new("out"), "rpoem");
         assert!(poem.iter().any(|j| j.program == "2poem" && j.args.contains(&"rpoem".to_string())));
         std::fs::remove_dir_all(&d).ok();
