@@ -126,7 +126,10 @@ fn main() {
             }
             let fe = arg(&a, "--frontend").unwrap_or_else(|| if matches!(b.as_str(), "rpoem" | "rporea") { "rust-wasm".into() } else { "bootstrap-ts".into() });
             if let Some(also) = arg(&a, "--also") {
-                let why = advice::check_also(&b, &fe, &also);
+                let (why, notes) = advice::check_also(&b, &fe, &also);
+                for n in &notes {
+                    println!("{n}");
+                }
                 if !why.is_empty() {
                     for w in &why {
                         eprintln!("pl2pl web: {w}");

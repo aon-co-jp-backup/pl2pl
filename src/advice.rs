@@ -68,6 +68,11 @@ fn includes(choice: &str) -> &'static [&'static str] {
     }
 }
 
+/// 含んではいるが、互換の完成度がまだ高くない(部分対応)ので、別に選んでも構わない物。選ぶと注意だけ出す
+fn partial(holder: &str, item: &str) -> bool {
+    matches!(holder, "rpoem" | "rporea") && matches!(item, "tauri" | "wundergraph-cosmo" | "open-cosmo")
+}
+
 /// RPoem / RPoRea では設計上使わないもの
 fn not_used(backend: &str) -> &'static [&'static str] {
     if matches!(backend, "rpoem" | "rporea") {
@@ -85,14 +90,14 @@ pub fn backend_notice(backend: &str) -> Option<String> {
     let name = if backend == "rporea" { "RPoRea(RPoem + Reaxt)" } else { "RPoem" };
     Some(format!(
         "【{name} について / About {name}】\n\
-         日本語: RPoem は Poem の Rust 版で、Tauri 互換・WunderGraph Cosmo 互換の機能と、tokio、WASM を含んでいます。そのため Tauri と WunderGraph Cosmo は、別に選ばないでください(選んでも、既に含んでいるためお断りします)。画面は HTML5 と CSS3 を使いますが、使う量はなるべく少なくします。JavaScript・TypeScript・Node.js・REST API は、設計上、使いません。\n\
-         English: RPoem is the Rust edition of Poem. It already includes Tauri-compatible and WunderGraph Cosmo-compatible features, plus tokio and WASM, so please do not choose Tauri or WunderGraph Cosmo separately (if you do, the request is declined because they are already included). The UI uses HTML5 and CSS3, kept as small as possible. By design, JavaScript, TypeScript, Node.js and REST APIs are not used.\n"
+         日本語: RPoem は Poem の Rust 版で、Tauri 互換・WunderGraph Cosmo 互換の機能と、tokio、WASM を含んでいます。ただし互換の完成度はまだ高くないため、Tauri や WunderGraph Cosmo を別に選ぶこともできます(その場合は注意を表示します)。画面は HTML5 と CSS3 を使いますが、使う量はなるべく少なくします。JavaScript・TypeScript・Node.js・REST API は、設計上、使いません。\n\
+         English: RPoem is the Rust edition of Poem. It already includes Tauri-compatible and WunderGraph Cosmo-compatible features, plus tokio and WASM, but that compatibility is not yet complete, so you may still choose Tauri or WunderGraph Cosmo separately (a caution is shown if you do). The UI uses HTML5 and CSS3, kept as small as possible. By design, JavaScript, TypeScript, Node.js and REST APIs are not used.\n"
     ))
 }
 
 /// `--also tauri,nodejs` のような追加の選択を調べる。戻り値: 断る理由(日本語と English)の一覧。空なら全部受け付け。
-pub fn check_also(backend: &str, frontend: &str, also: &str) -> Vec<String> {
-    let mut out = vec![];
+pub fn check_also(backend: &str, frontend: &str, also: &str) -> (Vec<String>, Vec<String>) {
+    let (mut out, mut notes) = (vec![], vec![]);
     for raw in also.split(',').map(str::trim).filter(|s| !s.is_empty()) {
         let Some(c) = canon(raw) else {
             out.push(format!("「{raw}」は選択肢にありません。/ \"{raw}\" is not a known option."));
@@ -100,7 +105,10 @@ pub fn check_also(backend: &str, frontend: &str, also: &str) -> Vec<String> {
         };
         let l = label(c);
         let holder = [backend, frontend].into_iter().find(|ch| includes(ch).contains(&c));
-        if let Some(h) = holder {
+        if let Some(h) = holder.filter(|h| partial(h, c)) {
+            let hl = if h == "rporea" { "RPoRea" } else { "RPoem" };
+            notes.push(format!("注意: {hl} は {l} 互換の機能を含んでいますが、互換の完成度はまだ高くないため、別に選ぶこともできます。選んだ場合は、重複や動作の違いにご注意ください。/ Note: {hl} includes {l}-compatible features, but the compatibility is not yet complete, so you may still select {l} separately. If you do, please watch for overlap and behavioural differences."));
+        } else if let Some(h) = holder {
             let hl = match h {
                 "rpoem" => "RPoem",
                 "rporea" => "RPoRea",
@@ -116,7 +124,7 @@ pub fn check_also(backend: &str, frontend: &str, also: &str) -> Vec<String> {
             out.push(format!("{l} は、設計上、使用しない仕様ですので、ご選択できません。/ {l} is not used by design, so it cannot be selected."));
         }
     }
-    out
+    (out, notes)
 }
 
 #[cfg(test)]
@@ -132,23 +140,24 @@ mod tests {
     }
     #[test]
     fn included_is_declined() {
-        let r = check_also("rporea", "rust-wasm", "tauri,cosmo,wasm");
-        assert_eq!(r.len(), 3);
-        assert!(r[0].contains("既に RPoRea に Tauri を含んでいますので、ご選択できません"));
-        assert!(r[1].contains("WunderGraph Cosmo is already included in RPoRea"));
-        assert!(r[2].contains("WASM"));
+        let (r, n) = check_also("rporea", "rust-wasm", "tauri,cosmo,wasm,tokio");
+        assert_eq!(r.len(), 2); // 構造上いっしょに選べない物だけ断る
+        assert!(r[0].contains("既に RPoRea に WASM を含んでいますので、ご選択できません"));
+        assert!(r[1].contains("tokio is already included in RPoRea"));
+        assert_eq!(n.len(), 2); // 互換が部分的な Tauri / Cosmo は選べて、注意だけ
+        assert!(n[0].contains("Tauri") && n[1].contains("not yet complete"));
     }
     #[test]
     fn not_used_by_design() {
-        let r = check_also("rpoem", "rust-wasm", "nodejs,rest,typescript,js");
+        let (r, _) = check_also("rpoem", "rust-wasm", "nodejs,rest,typescript,js");
         assert_eq!(r.len(), 4);
         assert!(r.iter().all(|x| x.contains("設計上") && x.contains("not used by design")));
     }
     #[test]
     fn mfastapi_includes_fastapi_and_unknown() {
-        let r = check_also("mfastapi", "bootstrap-ts", "fastapi,mojo,bootstrap,foo");
+        let (r, _) = check_also("mfastapi", "bootstrap-ts", "fastapi,mojo,bootstrap,foo");
         assert_eq!(r.len(), 4);
         assert!(r[3].contains("foo"));
-        assert!(check_also("rust-axum", "none", "tauri").is_empty());
+        assert!(check_also("rust-axum", "none", "tauri").0.is_empty());
     }
 }
