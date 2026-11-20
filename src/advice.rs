@@ -97,6 +97,26 @@ pub fn backend_notice(backend: &str) -> Option<String> {
     ))
 }
 
+
+/// Node.js(Next.js)を選んだときに添える「代わりになりうる物」。選んだ言語(backend)に合わせた当方の物を先に、他の言語の物を「このようなものもございます」として添える。
+/// 当方の物は、リポジトリの記載・実装で確認できた範囲だけ書く。他の言語の物は一般に知られた例で、当方では未検証。
+pub fn node_alternatives(backend: &str) -> String {
+    let (ja_own, en_own) = match backend {
+        "rust-axum" | "rust-poem" | "rpoem" | "rporea" => (
+            "【選んだ言語(Rust)の代わり】RPoem / RPoRea + Reaxt: 画面は Rust から WASM(wasm-bindgen-cli)にするため Node.js が要りません。`open-runo-view`(React 相当の仮想 DOM と SSR)、`open-runo-crossui`(Windows・macOS・Linux・Android・Web 向けの画面を1つの Rust から生成)、通信は Connect / gRPC-web(REST や Express が要りません)。",
+            "[For your language (Rust)] RPoem / RPoRea + Reaxt: the UI is built from Rust to WASM (wasm-bindgen-cli), so Node.js is not needed. `open-runo-view` (a React-like virtual DOM with SSR), `open-runo-crossui` (generates UIs for Windows, macOS, Linux, Android and Web from one Rust codebase), and Connect / gRPC-web for communication (no REST or Express needed).",
+        ),
+        "fastapi" | "mfastapi" => (
+            "【選んだ言語(Python)の代わり】FastAPI / MFastAPI は静的ファイルの配信(Starlette)を内蔵しており、Jinja2 のテンプレートで HTML を返せるので、画面のビルドに Node.js は要りません(この変換の出力も `web/` を FastAPI が配信します)。",
+            "[For your language (Python)] FastAPI / MFastAPI serve static files (Starlette) out of the box and can return HTML from Jinja2 templates, so the UI needs no Node.js build (this converter's output also serves `web/` from FastAPI).",
+        ),
+        _ => ("", ""),
+    };
+    let ja_other = "【他の言語では、このようなフレームワークもございます】Rust: Leptos・Dioxus・Yew(Rust から WASM)/ Python: htmx + Jinja2、NiceGUI / Go: templ + htmx / C#: Blazor(WASM)/ Elixir: Phoenix LiveView。いずれも Node.js を使わずに画面を作れる例ですが、当方では未検証です。";
+    let en_other = "[Frameworks in other languages] Rust: Leptos, Dioxus, Yew (Rust to WASM) / Python: htmx with Jinja2, NiceGUI / Go: templ with htmx / C#: Blazor (WASM) / Elixir: Phoenix LiveView. These are examples that build a UI without Node.js, but we have not verified them.";
+    format!("{ja_own}\n{en_own}\n{ja_other}\n{en_other}")
+}
+
 /// `--also tauri,nodejs` のような追加の選択を調べる。戻り値: 断る理由(日本語と English)の一覧。空なら全部受け付け。
 pub fn check_also(backend: &str, frontend: &str, also: &str) -> (Vec<String>, Vec<String>) {
     let (mut out, mut notes) = (vec![], vec![]);
@@ -126,7 +146,7 @@ pub fn check_also(backend: &str, frontend: &str, also: &str) -> (Vec<String>, Ve
             out.push(format!("{l} は、設計上、使用しない仕様ですので、ご選択できません。/ {l} is not used by design, so it cannot be selected."));
         } else if matches!(c, "nodejs" | "nextjs") {
             // 方針を押し付けない: 選べる。ただし推薦はしない、と伝える
-            notes.push(format!("お知らせ: {l} を選択されました。私たちは「Node.js を使わない」方針を利用者に押し付けませんので、そのままお使いいただけますが、推薦はしておりません。/ Notice: you selected {l}. We do not impose our no-Node.js policy on you, so you may use it as you wish, but we do not recommend it."));
+            notes.push(format!("お知らせ: {l} を選択されました。私たちは「Node.js を使わない」方針を利用者に押し付けませんので、そのままお使いいただけますが、推薦はしておりません。/ Notice: you selected {l}. We do not impose our no-Node.js policy on you, so you may use it as you wish, but we do not recommend it.\n{}", node_alternatives(backend)));
         }
     }
     (out, notes)
@@ -158,6 +178,7 @@ mod tests {
         assert_eq!(r.len(), 4);
         assert!(r.iter().all(|x| x.contains("設計上") && x.contains("not used by design")));
         let (r2, n2) = check_also("fastapi", "bootstrap-ts", "nodejs,next.js");
+        assert!(n2[0].contains("Python") && n2[0].contains("Leptos"));
         assert!(r2.is_empty() && n2.len() == 2 && n2[0].contains("推薦はしておりません") && n2[1].contains("do not recommend"));
     }
     #[test]
