@@ -8,6 +8,7 @@ fn canon(s: &str) -> Option<&'static str> {
         "tauri" => "tauri",
         "wundergraph-cosmo" | "wundergraph" | "cosmo" => "wundergraph-cosmo",
         "node" | "nodejs" | "node.js" => "nodejs",
+        "next" | "nextjs" | "next.js" => "nextjs",
         "javascript" | "js" => "javascript",
         "typescript" | "ts" => "typescript",
         "rest" | "rest-api" | "restapi" => "rest",
@@ -33,6 +34,7 @@ fn label(n: &str) -> &'static str {
         "tauri" => "Tauri",
         "wundergraph-cosmo" => "WunderGraph Cosmo",
         "nodejs" => "Node.js",
+        "nextjs" => "Next.js",
         "javascript" => "JavaScript",
         "typescript" => "TypeScript",
         "rest" => "REST API",
@@ -76,7 +78,7 @@ fn partial(holder: &str, item: &str) -> bool {
 /// RPoem / RPoRea では設計上使わないもの
 fn not_used(backend: &str) -> &'static [&'static str] {
     if matches!(backend, "rpoem" | "rporea") {
-        &["nodejs", "javascript", "typescript", "rest"]
+        &["nodejs", "nextjs", "javascript", "typescript", "rest"]
     } else {
         &[]
     }
@@ -122,6 +124,9 @@ pub fn check_also(backend: &str, frontend: &str, also: &str) -> (Vec<String>, Ve
             out.push(format!("既に {hl} に {l} を含んでいますので、ご選択できません。/ {l} is already included in {hl}, so it cannot be selected separately."));
         } else if not_used(backend).contains(&c) {
             out.push(format!("{l} は、設計上、使用しない仕様ですので、ご選択できません。/ {l} is not used by design, so it cannot be selected."));
+        } else if matches!(c, "nodejs" | "nextjs") {
+            // 方針を押し付けない: 選べる。ただし推薦はしない、と伝える
+            notes.push(format!("お知らせ: {l} を選択されました。私たちは「Node.js を使わない」方針を利用者に押し付けませんので、そのままお使いいただけますが、推薦はしておりません。/ Notice: you selected {l}. We do not impose our no-Node.js policy on you, so you may use it as you wish, but we do not recommend it."));
         }
     }
     (out, notes)
@@ -152,6 +157,8 @@ mod tests {
         let (r, _) = check_also("rpoem", "rust-wasm", "nodejs,rest,typescript,js");
         assert_eq!(r.len(), 4);
         assert!(r.iter().all(|x| x.contains("設計上") && x.contains("not used by design")));
+        let (r2, n2) = check_also("fastapi", "bootstrap-ts", "nodejs,next.js");
+        assert!(r2.is_empty() && n2.len() == 2 && n2[0].contains("推薦はしておりません") && n2[1].contains("do not recommend"));
     }
     #[test]
     fn mfastapi_includes_fastapi_and_unknown() {
