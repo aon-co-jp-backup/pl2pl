@@ -30,10 +30,10 @@ impl Stack {
             return Err(format!("db は {} から選んでください", DBS.join(" | ")));
         }
         if wasm_only && frontend == "bootstrap-ts" {
-            return Err("rpoem / rporea は Bootstrap・TypeScript を使いません(rust-wasm か none を選んでください)".into());
+            return Err("rpoem / rporea は Bootstrap・TypeScript を使わない設計ですので、ご選択できません(rust-wasm か none を選んでください)。/ RPoem and RPoRea do not use Bootstrap or TypeScript by design, so they cannot be selected (choose rust-wasm or none).".into());
         }
         if python && frontend == "rust-wasm" {
-            return Err("Python の backend で rust-wasm は選べません(bootstrap-ts か none)".into());
+            return Err("Python の backend で rust-wasm は選べません(bootstrap-ts か none)。/ rust-wasm cannot be selected with a Python backend (choose bootstrap-ts or none).".into());
         }
         Ok(Stack { backend: backend.into(), frontend: frontend.into(), db: db.into() })
     }

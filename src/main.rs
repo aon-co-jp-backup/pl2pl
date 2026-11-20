@@ -14,6 +14,7 @@ mod blade;
 mod middleware;
 mod php;
 mod watch;
+mod advice;
 mod stack;
 mod web;
 mod util;
@@ -30,7 +31,7 @@ const USAGE: &str = "pl2pl — プラットフォーム/HPC 移植コンバー�
   pl2pl omp    <dir|file> --out <dir>        C/C++ の独立ループへ OpenMP 指示行を付ける
   pl2pl kokkos <dir|file> --out <dir>        C++ の独立ループを Kokkos へ
   pl2pl pyhpc  <dir|file> --out <dir> [--mpi]  Python の数値関数へ Numba、--mpi で mpi4py の雛形
-  pl2pl web    <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] --out <dir>
+  pl2pl web    <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] [--also tauri,cosmo,nodejs,...] --out <dir>
                                               COBOL(など)を、選んだ組み合わせのアプリの骨組みごと変換(最優先機能)
   pl2pl web    <dir> --target <fastapi|mfastapi|rust-poem|rpoem> --out <dir> [--dry-run]
                                               Java/COBOL/Flask/Django を判定し java_to・cobol_to・2fastapi・2poem へ振り分け
@@ -120,6 +121,19 @@ fn main() {
         let dry = a.iter().any(|x| x == "--dry-run");
         // 組み合わせ選択: --backend / --frontend / --db のどれかがあれば、--target より優先して骨組みを足す
         if let Some(b) = arg(&a, "--backend") {
+            if let Some(n) = advice::backend_notice(&b) {
+                println!("{n}");
+            }
+            let fe = arg(&a, "--frontend").unwrap_or_else(|| if matches!(b.as_str(), "rpoem" | "rporea") { "rust-wasm".into() } else { "bootstrap-ts".into() });
+            if let Some(also) = arg(&a, "--also") {
+                let why = advice::check_also(&b, &fe, &also);
+                if !why.is_empty() {
+                    for w in &why {
+                        eprintln!("pl2pl web: {w}");
+                    }
+                    std::process::exit(2);
+                }
+            }
             match stack::Stack::new(&b, arg(&a, "--frontend").as_deref(), arg(&a, "--db").as_deref()) {
                 Ok(st) => std::process::exit(web::run_stack(&input, &out, &st, dry)),
                 Err(e) => {
