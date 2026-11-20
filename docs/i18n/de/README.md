@@ -52,5 +52,9 @@ pl2pl ir ./project --out ./out --format openapi
 - Echte E-Mail-Warnungen und die automatische Reparatur durch KI prüfen.
 - Prüfen, ob es auf der GPU läuft (open-cuda / open-directx).
 
+## Neu in v0.2.0
+- Frei kombinieren: `pl2pl web <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] --out <dir>`. COBOL wird umgeschrieben; C, C++ und Fortran laufen unverändert und werden vom Web aus aufgerufen.
+- `pl2pl c2rust` (einfaches C und C++) und `pl2pl f2rust` (einfaches Fortran) erzeugen Rust. `pl2pl cobol --os <linux|macos|unix|windows>` erstellt ein Build-Skript für GnuCOBOL.
+
 ## Mehr erfahren
 [LANGUAGES.md](../../LANGUAGES.md) (Liste der Sprachen) / [COMBINATIONS.md](../../COMBINATIONS.md) (Kombinationen) / [DESIGN.md](../../DESIGN.md) (der Entwurf, vom Eigentümer geschrieben) / [components/README.md](../../../components/README.md) (mitgelieferte Teile). Diese Dateien sind auf Japanisch.

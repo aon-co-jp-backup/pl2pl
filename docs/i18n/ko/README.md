@@ -52,5 +52,9 @@ pl2pl ir ./project --out ./out --format openapi
 - 실제 이메일 알림과 AI 자동 수정 확인.
 - GPU에서 돌아가는지 확인(open-cuda / open-directx).
 
+## v0.2.0의 새 기능
+- 마음대로 조합: `pl2pl web <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] --out <dir>`. COBOL은 다시 쓰고, C·C++·Fortran은 그대로 실행하며 웹에서 부릅니다.
+- `pl2pl c2rust`(단순한 C와 C++)와 `pl2pl f2rust`(단순한 Fortran)는 Rust를 만듭니다. `pl2pl cobol --os <linux|macos|unix|windows>`는 GnuCOBOL 빌드 스크립트를 만듭니다.
+
 ## 더 알아보기
 [LANGUAGES.md](../../LANGUAGES.md)(언어 목록) / [COMBINATIONS.md](../../COMBINATIONS.md)(조합) / [DESIGN.md](../../DESIGN.md)(설계, 소유자가 작성 중) / [components/README.md](../../../components/README.md)(함께 설치되는 부품). 이 파일들은 일본어입니다.

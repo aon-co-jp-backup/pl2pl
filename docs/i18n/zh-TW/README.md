@@ -52,5 +52,9 @@ pl2pl ir ./project --out ./out --format openapi
 - 確認真實的電子郵件通知和 AI 自動修復。
 - 確認在 GPU 上執行(open-cuda / open-directx)。
 
+## v0.2.0 新功能
+- 自由搭配:`pl2pl web <dir> --backend <rust-axum|rust-poem|fastapi|mfastapi|rpoem|rporea> [--frontend bootstrap-ts|rust-wasm|none] [--db none|mysql|mariadb|postgres|sqlite] --out <dir>`。COBOL 會被改寫;C、C++、Fortran 維持原樣執行,由網頁呼叫。
+- `pl2pl c2rust`(簡單的 C 與 C++)和 `pl2pl f2rust`(簡單的 Fortran)可產生 Rust。`pl2pl cobol --os <linux|macos|unix|windows>` 產生 GnuCOBOL 的建置腳本。
+
 ## 了解更多
 [LANGUAGES.md](../../LANGUAGES.md)(語言清單) / [COMBINATIONS.md](../../COMBINATIONS.md)(組合) / [DESIGN.md](../../DESIGN.md)(設計,由擁有者撰寫) / [components/README.md](../../../components/README.md)(附帶的元件)。這些檔案為日文。
