@@ -267,3 +267,16 @@ pub fn set_choice(v: &str) -> Result<(), String> {
     }
     std::fs::write(&p, format!("llm={v}\n")).map_err(|e| e.to_string())
 }
+
+/// `pl2pl maturity` 用: 互換が完成かどうかの参考意見を aruaru-llm(open-cuda / open-cpu で動く)に1文で聞く。AI だけでは判定を変えない。
+pub fn opinion(url: &str, holder: &str, item: &str, note: &str, probe_ok: bool) -> String {
+    if !healthy(url) {
+        return "aruaru-llm に接続できません(試験の結果だけで判定します)".into();
+    }
+    let _ = CANDIDATES.iter().any(|c| post(url, "QwenSelect", &format!("{{\"id\":\"{}\"}}", c.0)).is_ok());
+    let prompt = format!("{holder} は {item} 互換の機能を含みます。確認: {note}。試験は{}。互換が実用的に完成していると言えるか、日本語で1文だけで短く答えてください。", if probe_ok { "成功" } else { "失敗" });
+    match post(url, "GenerateQwen", &format!("{{\"prompt\":{:?},\"max_new_tokens\":50}}", prompt)) {
+        Ok(r) => json_text(&r).map(|t| t.trim().replace('\n', " ")).filter(|t| !t.is_empty()).unwrap_or_else(|| "(答えなし)".into()),
+        Err(e) => format!("(取得できませんでした: {e})"),
+    }
+}

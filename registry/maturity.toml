@@ -1,0 +1,50 @@
+# 「含んでいるが互換の完成度がまだ高くない」物の台帳。status = partial の間は、別に選んでも断らず注意だけ出す。
+# `pl2pl maturity` が probe(試験コマンド)を実行し、成功したら完成(complete)と判定する。AI(aruaru-llm)の意見は参考で、AI だけでは変えない。
+# dir = 兄弟リポジトリの場所(--repo の下)。probe が空なら判定できない(partial のまま)。
+[[compat]]
+holder = rpoem
+item = tauri
+status = partial
+dir = RPoem
+probe =
+note = Tauri 互換の検証用の試験がまだ無い
+
+[[compat]]
+holder = rporea
+item = tauri
+status = partial
+dir = RPoem
+probe =
+note = Tauri 互換の検証用の試験がまだ無い
+
+[[compat]]
+holder = rpoem
+item = wundergraph-cosmo
+status = partial
+dir = RPoem
+probe = cargo test -q -p open-runo-federation -p open-runo-gateway
+note = ゲートウェイ・フェデレーションの試験(WunderGraph Cosmo 互換の一部)
+
+[[compat]]
+holder = rporea
+item = wundergraph-cosmo
+status = partial
+dir = RPoem
+probe = cargo test -q -p open-runo-federation -p open-runo-gateway
+note = ゲートウェイ・フェデレーションの試験(WunderGraph Cosmo 互換の一部)
+
+[[compat]]
+holder = rpoem
+item = open-cosmo
+status = partial
+dir = open-cosmo
+probe = cargo test -q
+note = open-cosmo 本体の試験
+
+[[compat]]
+holder = rporea
+item = open-cosmo
+status = partial
+dir = open-cosmo
+probe = cargo test -q
+note = open-cosmo 本体の試験

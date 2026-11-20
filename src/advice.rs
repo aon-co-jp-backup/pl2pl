@@ -70,7 +70,7 @@ fn includes(choice: &str) -> &'static [&'static str] {
 
 /// 含んではいるが、互換の完成度がまだ高くない(部分対応)ので、別に選んでも構わない物。選ぶと注意だけ出す
 fn partial(holder: &str, item: &str) -> bool {
-    matches!(holder, "rpoem" | "rporea") && matches!(item, "tauri" | "wundergraph-cosmo" | "open-cosmo")
+    crate::maturity::is_partial(holder, item)
 }
 
 /// RPoem / RPoRea では設計上使わないもの
